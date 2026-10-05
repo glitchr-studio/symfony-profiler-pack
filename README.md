@@ -47,7 +47,8 @@ return [
 ];
 ```
 
-Symfony Flex adds the line for every environment; keep `dev` only. There is nothing to configure.
+Symfony Flex adds the line by itself, for `dev` and `test` as for any `--dev` bundle; `dev` is enough.
+There is nothing to configure.
 
 Requires PHP 8.2, Symfony 7.4 or 8, and a browser that knows the CSS `:has()` selector (Chrome 105,
 Safari 15.4, Firefox 121).
