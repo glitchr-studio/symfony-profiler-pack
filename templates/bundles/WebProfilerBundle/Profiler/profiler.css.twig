@@ -1,0 +1,13 @@
+{{- include('@!WebProfiler/Profiler/profiler.css.twig') -}}
+{%- if (profiler_pack|default({})).profiler_pages|default(false) %}
+
+/* profiler-pack: the profiler's pages take the width of the window. */
+.container {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+}
+.container .container {
+    padding: 0;
+}
+{%- endif -%}

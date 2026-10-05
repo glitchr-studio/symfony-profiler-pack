@@ -1,0 +1,147 @@
+<?php
+
+namespace Glitchr\ProfilerPack\Tests;
+
+use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
+
+final class ToolbarTest extends PackTestCase
+{
+    private const ALL_OFF = ['floating' => false, 'fixes' => false, 'profiler_pages' => false, 'locale_panel' => false];
+
+    public function testThePageCarriesTheOriginalToolbarThenTheFloatingOne(): void
+    {
+        $client = self::client();
+        $client->request('GET', '/en/page');
+        self::assertResponseIsSuccessful();
+
+        $toolbar = self::toolbarOf($client);
+
+        self::assertStringContainsString('Sfjs', $toolbar, 'The original script is there, whole.');
+        self::assertStringContainsString('__profilerPackFloating', $toolbar);
+        self::assertStringContainsString('profiler-pack/toolbar/position', $toolbar);
+        self::assertStringContainsString('__profilerPackGuard', $toolbar);
+        self::assertLessThan(strpos($toolbar, '__profilerPackFloating'), strpos($toolbar, 'Sfjs'), 'What the pack adds comes after the original.');
+    }
+
+    public function testTheStylesAreTheOriginalOnesThenThePacks(): void
+    {
+        $client = self::client();
+        $client->request('GET', '/en/page');
+
+        $styles = self::stylesOf($client);
+
+        self::assertStringContainsString('--sf-toolbar-gray-800', $styles, 'The original rules are there.');
+        self::assertStringContainsString('.sf-toolbarreset.inverted', $styles);
+        self::assertStringContainsString('[id^="sfwdt"]:not(:has(.sf-toolbarreset))', $styles);
+        self::assertLessThan(strpos($styles, '.sf-toolbarreset.inverted'), strpos($styles, '--sf-toolbar-gray-800'));
+    }
+
+    public function testWithEverySwitchOffTheToolbarIsTheOneSymfonyShips(): void
+    {
+        $stock = self::client(null);
+        $stock->request('GET', '/en/page');
+        $stockToolbar = self::toolbarOf($stock);
+        $stockStyles = self::stylesOf($stock);
+
+        $off = self::client(self::ALL_OFF);
+        $off->request('GET', '/en/page');
+
+        self::assertSame($stockToolbar, self::toolbarOf($off));
+        self::assertSame($stockStyles, self::stylesOf($off));
+    }
+
+    public function testNotFloatingThereIsNoGestureAndNoRestyle(): void
+    {
+        $client = self::client(['floating' => false]);
+        $client->request('GET', '/en/page');
+
+        self::assertStringNotContainsString('__profilerPackFloating', self::toolbarOf($client));
+        self::assertStringContainsString('__profilerPackGuard', self::toolbarOf($client), 'The fixes do not depend on it.');
+        self::assertStringNotContainsString('.sf-toolbarreset.inverted', self::stylesOf($client));
+    }
+
+    public function testEachGestureHasItsSwitch(): void
+    {
+        $client = self::client(['draggable' => false, 'minimizable' => false]);
+        $client->request('GET', '/en/page');
+        $toolbar = self::toolbarOf($client);
+
+        self::assertStringContainsString('var DRAGGABLE = false;', $toolbar);
+        self::assertStringContainsString('var RESIZABLE = true;', $toolbar);
+        self::assertStringContainsString('var MINIMIZABLE = false;', $toolbar);
+
+        $client = self::client(['draggable' => false, 'resizable' => false, 'minimizable' => false]);
+        $client->request('GET', '/en/page');
+
+        self::assertStringNotContainsString('__profilerPackFloating', self::toolbarOf($client), 'No gesture left: no script.');
+        self::assertStringContainsString('.sf-toolbarreset.inverted', self::stylesOf($client), 'The toolbar still floats.');
+    }
+
+    public function testWithoutTheFixesNeitherGuardIsWritten(): void
+    {
+        $client = self::client(['fixes' => false]);
+        $client->request('GET', '/en/page');
+
+        self::assertStringNotContainsString('__profilerPackGuard', self::toolbarOf($client));
+        self::assertStringNotContainsString(':not(:has(.sf-toolbarreset))', self::toolbarOf($client).self::stylesOf($client));
+    }
+
+    public function testTheToolbarHidesWhileThePageSaysSo(): void
+    {
+        $client = self::client(['hide_when' => 'html.is-loading']);
+        $client->request('GET', '/en/page');
+
+        self::assertStringContainsString('html.is-loading .sf-toolbar { display: none !important; }', self::toolbarOf($client));
+    }
+
+    public function testHideWhenIsOneSelector(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('"hide_when" is one CSS selector');
+
+        self::client(['hide_when' => 'html { display: none } body']);
+    }
+
+    public function testAjaxReplaceIsLeftAsTheApplicationSetIt(): void
+    {
+        $client = self::client();
+        $client->xmlHttpRequest('GET', '/ajax');
+        self::assertFalse($client->getResponse()->headers->has('Symfony-Debug-Toolbar-Replace'));
+
+        $client = self::client([], ['toolbar' => ['ajax_replace' => true]]);
+        $client->xmlHttpRequest('GET', '/ajax');
+        self::assertSame('1', $client->getResponse()->headers->get('Symfony-Debug-Toolbar-Replace'));
+    }
+
+    public function testAjaxReplaceIsSetWhenAsked(): void
+    {
+        $client = self::client(['ajax_replace' => true]);
+        $client->xmlHttpRequest('GET', '/ajax');
+        self::assertSame('1', $client->getResponse()->headers->get('Symfony-Debug-Toolbar-Replace'));
+
+        $client = self::client(['ajax_replace' => false], ['toolbar' => ['ajax_replace' => true]]);
+        $client->xmlHttpRequest('GET', '/ajax');
+        self::assertFalse($client->getResponse()->headers->has('Symfony-Debug-Toolbar-Replace'));
+    }
+
+    public function testTheProfilersPagesAreWiderAndCanBeLeftAsTheyAre(): void
+    {
+        $client = self::client();
+        $client->request('GET', '/en/page');
+        $token = $client->getResponse()->headers->get('X-Debug-Token');
+        $client->request('GET', '/_profiler/'.$token.'?panel=request');
+        self::assertResponseIsSuccessful();
+        $page = (string) $client->getResponse()->getContent();
+
+        self::assertStringContainsString('--font-family-system', $page, 'The original styles are there.');
+        self::assertStringContainsString('profiler-pack: the profiler\'s pages take the width of the window', $page);
+
+        $client = self::client(['profiler_pages' => false]);
+        $client->request('GET', '/en/page');
+        $token = $client->getResponse()->headers->get('X-Debug-Token');
+        $client->request('GET', '/_profiler/'.$token.'?panel=request');
+        self::assertResponseIsSuccessful();
+
+        self::assertStringNotContainsString('profiler-pack: the profiler\'s pages take the width of the window', (string) $client->getResponse()->getContent());
+    }
+}

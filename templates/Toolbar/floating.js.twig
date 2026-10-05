@@ -1,0 +1,281 @@
+{# The floating toolbar's gestures. The handle is the toolbar's own button
+   (.sf-toolbar-toggle-button): held and moved, it carries the toolbar; a plain
+   click still opens and closes it. The left edge resizes. Place and width are
+   kept in localStorage. The toolbar's content is replaced by every load
+   (.sf-toolbarreset is a new element each time): it is looked up again on each
+   change of the page. #}
+(function () {
+    'use strict';
+
+    if (window.__profilerPackFloating) {
+        return;
+    }
+    window.__profilerPackFloating = true;
+
+    var DRAGGABLE = {{ pack.draggable|default(false) ? 'true' : 'false' }};
+    var RESIZABLE = {{ pack.resizable|default(false) ? 'true' : 'false' }};
+    var MINIMIZABLE = {{ pack.minimizable|default(false) ? 'true' : 'false' }};
+
+    var POSITION_KEY = 'profiler-pack/toolbar/position';
+    var WIDTH_KEY = 'profiler-pack/toolbar/width';
+    var THRESHOLD = 5;
+    var PADDING = 16;
+    var EDGE = 15;
+    var MIN_WIDTH = 200;
+    var FOLDED_WIDTH = 65;
+
+    var bar = null;
+    var content = null;
+    var fullWidth = 0;
+    var x = 0;
+    var y = 0;
+    var drag = null;
+    var resize = null;
+    var swallowClick = false;
+    var openBeforeClicks = true;
+
+    function read(key) {
+        try {
+            return window.localStorage.getItem(key);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function write(key, value) {
+        try {
+            if (null === value) {
+                window.localStorage.removeItem(key);
+            } else {
+                window.localStorage.setItem(key, value);
+            }
+        } catch (e) {
+        }
+    }
+
+    function isOpen() {
+        return bar && !bar.classList.contains('sf-toolbar-closed') && content && content.offsetWidth > 0;
+    }
+
+    /* Widths are the ones written in the style: the content's, without its padding and borders. */
+    function chrome() {
+        var style = window.getComputedStyle(content);
+        if ('border-box' === style.boxSizing) {
+            return 0;
+        }
+
+        return (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0) + (parseFloat(style.borderLeftWidth) || 0) + (parseFloat(style.borderRightWidth) || 0);
+    }
+
+    function width() {
+        return content.offsetWidth - chrome();
+    }
+
+    function clampPosition(nx, ny) {
+        var height = bar.getBoundingClientRect().height;
+        var minX = -(window.innerWidth - 5 * PADDING);
+        var minY = -(window.innerHeight - height - 2 * PADDING);
+
+        return {
+            x: Math.min(2 * PADDING, Math.max(minX, nx)),
+            y: Math.min(0, Math.max(Math.min(0, minY), ny))
+        };
+    }
+
+    function clampWidth(width) {
+        return Math.min(Math.max(fullWidth, MIN_WIDTH), Math.max(FOLDED_WIDTH, width));
+    }
+
+    function place(nx, ny) {
+        var clamped = clampPosition(nx, ny);
+        bar.style.transform = 'translate(' + clamped.x + 'px, ' + clamped.y + 'px)';
+
+        return clamped;
+    }
+
+    function invert() {
+        if (!content) {
+            return;
+        }
+        var rect = content.getBoundingClientRect();
+        content.classList.toggle('inverted', rect.height > 0 && rect.top + rect.height / 2 < window.innerHeight / 2);
+    }
+
+    function restore() {
+        var saved = parseInt(read(WIDTH_KEY), 10);
+        if ((RESIZABLE || MINIMIZABLE) && saved > 0) {
+            content.style.width = clampWidth(saved) + 'px';
+        }
+
+        var position = null;
+        try {
+            position = JSON.parse(read(POSITION_KEY));
+        } catch (e) {
+        }
+        var placed = place(DRAGGABLE && position ? Number(position.x) || 0 : 0, DRAGGABLE && position ? Number(position.y) || 0 : 0);
+        x = placed.x;
+        y = placed.y;
+
+        invert();
+    }
+
+    function acquire() {
+        var currentBar = document.querySelector('.sf-toolbar');
+        var currentContent = currentBar ? currentBar.querySelector('.sf-toolbarreset') : null;
+        if (!currentBar || !currentContent) {
+            return;
+        }
+        if (currentBar === bar && currentContent === content) {
+            return;
+        }
+
+        bar = currentBar;
+        content = currentContent;
+
+        var written = content.style.width;
+        content.style.width = '';
+        fullWidth = content.offsetWidth ? width() : fullWidth;
+        content.style.width = written;
+
+        restore();
+    }
+
+    function onLeftEdge(event) {
+        if (!isOpen()) {
+            return false;
+        }
+        var rect = content.getBoundingClientRect();
+
+        return event.clientX >= rect.left && event.clientX <= rect.left + EDGE && event.clientY >= rect.top && event.clientY <= rect.bottom;
+    }
+
+    function onHandle(event) {
+        return bar && event.target && event.target.closest && event.target.closest('.sf-toolbar-toggle-button') && bar.contains(event.target);
+    }
+
+    document.addEventListener('mousedown', function (event) {
+        if (0 !== event.button || !bar) {
+            return;
+        }
+
+        if (DRAGGABLE && onHandle(event)) {
+            drag = { startX: event.clientX, startY: event.clientY, moved: false };
+            swallowClick = false;
+            event.preventDefault();
+
+            return;
+        }
+
+        if (RESIZABLE && onLeftEdge(event)) {
+            resize = { right: content.getBoundingClientRect().right };
+            event.preventDefault();
+            event.stopPropagation();
+        }
+    });
+
+    document.addEventListener('mousemove', function (event) {
+        if (drag) {
+            var dx = event.clientX - drag.startX;
+            var dy = event.clientY - drag.startY;
+            if (!drag.moved && Math.abs(dx) <= THRESHOLD && Math.abs(dy) <= THRESHOLD) {
+                return;
+            }
+            drag.moved = true;
+            place(x + dx, y + dy);
+            invert();
+
+            return;
+        }
+
+        if (resize) {
+            content.style.width = Math.max(Math.min(MIN_WIDTH, fullWidth), clampWidth(resize.right - event.clientX - chrome())) + 'px';
+        }
+    });
+
+    document.addEventListener('mouseup', function (event) {
+        if (drag) {
+            if (drag.moved) {
+                var placed = place(x + event.clientX - drag.startX, y + event.clientY - drag.startY);
+                x = placed.x;
+                y = placed.y;
+                write(POSITION_KEY, JSON.stringify({ x: x, y: y }));
+                swallowClick = true;
+                invert();
+            }
+            drag = null;
+        }
+
+        if (resize) {
+            write(WIDTH_KEY, String(Math.round(width())));
+            resize = null;
+        }
+    });
+
+    /* A move that ends on the handle is not a click on it: the toolbar stays open or closed as it was. */
+    document.addEventListener('click', function (event) {
+        if (!onHandle(event)) {
+            swallowClick = false;
+
+            return;
+        }
+        if (swallowClick) {
+            swallowClick = false;
+            event.stopImmediatePropagation();
+            event.preventDefault();
+
+            return;
+        }
+        if (1 === event.detail) {
+            openBeforeClicks = !bar.classList.contains('sf-toolbar-closed');
+        }
+    }, true);
+
+    if (MINIMIZABLE) {
+        document.addEventListener('dblclick', function (event) {
+            if (!bar) {
+                return;
+            }
+
+            if (DRAGGABLE && onHandle(event)) {
+                var left = -(window.innerWidth - 5 * PADDING);
+                var placed = place(x <= left / 2 ? 0 : left, 0);
+                x = placed.x;
+                y = placed.y;
+                write(POSITION_KEY, JSON.stringify({ x: x, y: y }));
+
+                /* The two clicks of a double click are clicks on the toolbar's button too: it is left open or closed as it was before them. */
+                var toggle = event.target.closest('.sf-toolbar-toggle-button');
+                window.setTimeout(function () {
+                    if (openBeforeClicks === bar.classList.contains('sf-toolbar-closed')) {
+                        toggle.click();
+                    }
+                    invert();
+                }, 0);
+
+                return;
+            }
+
+            if (onLeftEdge(event)) {
+                var folded = width() <= FOLDED_WIDTH + 1;
+                content.style.width = (folded ? Math.max(fullWidth, MIN_WIDTH) : FOLDED_WIDTH) + 'px';
+                write(WIDTH_KEY, folded ? null : String(FOLDED_WIDTH));
+                resize = null;
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        });
+    }
+
+    window.addEventListener('resize', function () {
+        if (!bar) {
+            return;
+        }
+        var placed = place(x, y);
+        x = placed.x;
+        y = placed.y;
+        invert();
+    });
+
+    acquire();
+    new MutationObserver(acquire).observe(document.documentElement, { childList: true, subtree: true });
+})();

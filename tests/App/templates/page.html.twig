@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="{{ locale ?? 'en' }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Profiler pack - {{ slug }}</title>
+    <style>
+        body { font: 16px/1.5 Georgia, serif; margin: 3rem auto; max-width: 40rem; padding: 0 1rem; }
+        button, .btn { font: inherit; padding: .4rem .8rem; }
+    </style>
+</head>
+<body>
+    <h1>{{ slug }}{{ locale ? ' (' ~ locale ~ ')' }}</h1>
+    <p>A page of the test application. Its styles are its own: nothing of the toolbar's should change them.</p>
+    <ul>
+        <li><a href="{{ path('page', {_locale: 'en'}) }}">English</a>, <a href="{{ path('page', {_locale: 'fr'}) }}">French</a>, <a href="{{ path('page', {_locale: 'de', slug: 'about', page: 2}) }}">German, "about", page 2</a></li>
+        <li><a href="{{ path('plain') }}">A page whose route has no locale</a></li>
+        <li><a href="{{ path('failing') }}">A page that fails</a></li>
+    </ul>
+    <p><button type="button" class="btn btn--neutral" id="ajax">Send an AJAX request</button> <output id="answer"></output></p>
+    <script>
+        document.getElementById('ajax').addEventListener('click', function () {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', {{ path('ajax')|json_encode|raw }});
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            xhr.onload = function () { document.getElementById('answer').textContent = xhr.responseText; };
+            xhr.send();
+        });
+    </script>
+    <!-- end of the page -->
+</body>
+</html>

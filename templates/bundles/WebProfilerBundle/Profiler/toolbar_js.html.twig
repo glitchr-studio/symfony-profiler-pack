@@ -1,0 +1,31 @@
+{#
+   The original comes first and whole. What follows is added after it.
+
+   CAUTION, as in the original: WebProfilerBundle removes every line break from
+   this template's output before writing it in the page. In the scripts, only
+   comments between slash-star marks, and a semicolon after every statement.
+#}
+{%- set pack = profiler_pack|default({}) -%}
+{%- set style_nonce = csp_style_nonce is defined and csp_style_nonce ? csp_style_nonce : null -%}
+{%- set script_nonce = csp_script_nonce is defined and csp_script_nonce ? csp_script_nonce : null -%}
+{%- if pack.fixes|default(false) or pack.hide_when|default(null) -%}
+<style{% if style_nonce %} nonce="{{ style_nonce }}"{% endif %}>
+{%- if pack.fixes|default(false) -%}
+    [id^="sfwdt"]:not(:has(.sf-toolbarreset)) { opacity: 0; pointer-events: none; }
+{%- endif -%}
+{%- if pack.hide_when|default(null) -%}
+    {{ pack.hide_when|raw }} .sf-toolbar { display: none !important; }
+{%- endif -%}
+</style>
+{%- endif -%}
+{{- include('@!WebProfiler/Profiler/toolbar_js.html.twig') -}}
+{%- if pack.draggable|default(false) or pack.resizable|default(false) or pack.minimizable|default(false) -%}
+<script{% if script_nonce %} nonce="{{ script_nonce }}"{% endif %}>/*<![CDATA[*/
+{{ include('@ProfilerPack/Toolbar/floating.js.twig', {pack: pack}) }}
+/*]]>*/</script>
+{%- endif -%}
+{%- if pack.fixes|default(false) -%}
+<script{% if script_nonce %} nonce="{{ script_nonce }}"{% endif %}>/*<![CDATA[*/
+{{ include('@ProfilerPack/Toolbar/fixes.js.twig') }}
+/*]]>*/</script>
+{%- endif -%}

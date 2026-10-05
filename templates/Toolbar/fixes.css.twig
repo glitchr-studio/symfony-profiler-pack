@@ -1,0 +1,10 @@
+/* The toolbar's place holds nothing to show until its content is there: no
+   "Loading the web debug toolbar…" in the page's own fonts while it loads.
+   :has() - Chrome 105, Safari 15.4, Firefox 121. */
+[id^="sfwdt"]:not(:has(.sf-toolbarreset)) {
+    opacity: 0;
+    pointer-events: none;
+}
+[id^="sfwdt"] {
+    transition: opacity 0.15s ease-in;
+}

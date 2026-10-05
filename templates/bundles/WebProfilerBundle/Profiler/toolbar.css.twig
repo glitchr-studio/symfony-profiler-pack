@@ -1,0 +1,10 @@
+{{- include('@!WebProfiler/Profiler/toolbar.css.twig') -}}
+{%- set pack = profiler_pack|default({}) -%}
+{%- if pack.fixes|default(false) %}
+
+{{ include('@ProfilerPack/Toolbar/fixes.css.twig') }}
+{%- endif -%}
+{%- if pack.floating|default(false) %}
+
+{{ include('@ProfilerPack/Toolbar/floating.css.twig') }}
+{%- endif -%}

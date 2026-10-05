@@ -1,0 +1,29 @@
+{# A toolbar block without its details (.sf-toolbar-info) makes the original
+   hover handler read a width on nothing. Each block's handler is wrapped to do
+   nothing in that case; blocks come back with every toolbar load. #}
+(function () {
+    'use strict';
+
+    function guard() {
+        var blocks = document.querySelectorAll('.sf-toolbar-block');
+        for (var i = 0; i < blocks.length; i++) {
+            (function (block) {
+                var original = block.onmouseover;
+                if (typeof original !== 'function' || original.__profilerPackGuard) {
+                    return;
+                }
+                var guarded = function (event) {
+                    if (!this.querySelector('.sf-toolbar-info')) {
+                        return;
+                    }
+                    return original.call(this, event);
+                };
+                guarded.__profilerPackGuard = true;
+                block.onmouseover = guarded;
+            })(blocks[i]);
+        }
+    }
+
+    guard();
+    new MutationObserver(guard).observe(document.documentElement, { childList: true, subtree: true });
+})();

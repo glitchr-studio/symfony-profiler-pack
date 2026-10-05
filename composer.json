@@ -1,0 +1,39 @@
+{
+    "name": "glitchr/symfony-profiler-pack",
+    "description": "A floating web debug toolbar for Symfony's profiler (drag it, resize it, fold it), a locale panel and wider profiler pages. A bundle with code, not a Composer pack.",
+    "type": "symfony-bundle",
+    "license": "MIT",
+    "keywords": ["symfony", "profiler", "web debug toolbar", "toolbar", "debug", "dev"],
+    "homepage": "https://github.com/glitchr-studio/symfony-profiler-pack",
+    "authors": [
+        {
+            "name": "Marco Meyer",
+            "email": "marco.meyer@glitchr.io"
+        }
+    ],
+    "require": {
+        "php": ">=8.2",
+        "symfony/framework-bundle": "^7.4|^8.0",
+        "symfony/twig-bundle": "^7.4|^8.0",
+        "symfony/web-profiler-bundle": "^7.4|^8.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.5|^12.0",
+        "symfony/browser-kit": "^7.4|^8.0",
+        "symfony/css-selector": "^7.4|^8.0",
+        "symfony/translation": "^7.4|^8.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Glitchr\\ProfilerPack\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Glitchr\\ProfilerPack\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

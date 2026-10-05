@@ -1,0 +1,107 @@
+{% extends '@WebProfiler/Profiler/layout.html.twig' %}
+
+{% block toolbar %}
+    {% set icon %}
+        {{ source('@ProfilerPack/Icon/locale.svg') }}
+        <span class="sf-toolbar-value">{{ collector.locale|default('-') }}</span>
+    {% endset %}
+
+    {% set text %}
+        <div class="sf-toolbar-info-piece">
+            <b>Locale</b>
+            <span class="sf-toolbar-status">{{ collector.locale|default('-') }}</span>
+        </div>
+        <div class="sf-toolbar-info-piece">
+            <b>Default locale</b>
+            <span class="sf-toolbar-status">{{ collector.defaultLocale|default('-') }}</span>
+        </div>
+        <div class="sf-toolbar-info-piece">
+            <b>Timezone</b>
+            <span>{{ collector.timezone|default('-') }}</span>
+        </div>
+        {% if collector.switches|length > 1 %}
+            <div class="sf-toolbar-info-piece">
+                <b>This page in</b>
+                <span>
+                    {% for locale, url in collector.switches %}
+                        {% if locale == collector.locale %}
+                            <span class="sf-toolbar-status sf-toolbar-status-green">{{ locale }}</span>
+                        {% else %}
+                            <a href="{{ url }}" hreflang="{{ locale }}">{{ locale }}</a>
+                        {% endif %}
+                    {% endfor %}
+                </span>
+            </div>
+        {% endif %}
+    {% endset %}
+
+    {{ include('@WebProfiler/Profiler/toolbar_item.html.twig', {link: profiler_url}) }}
+{% endblock %}
+
+{% block menu %}
+    <span class="label">
+        <span class="icon">{{ source('@ProfilerPack/Icon/locale.svg') }}</span>
+        <strong>Locale</strong>
+    </span>
+{% endblock %}
+
+{% block panel %}
+    <h2>Locale</h2>
+
+    <div class="metrics">
+        <div class="metric">
+            <span class="value">{{ collector.locale|default('-') }}</span>
+            <span class="label">Locale of the request</span>
+        </div>
+        <div class="metric">
+            <span class="value">{{ collector.defaultLocale|default('-') }}</span>
+            <span class="label">Default locale</span>
+        </div>
+        <div class="metric">
+            <span class="value">{{ collector.timezone|default('-') }}</span>
+            <span class="label">Timezone</span>
+        </div>
+    </div>
+
+    <table>
+        <tbody>
+            <tr>
+                <th scope="row">Enabled locales</th>
+                <td>{{ collector.enabledLocales ? collector.enabledLocales|join(', ') : 'none set (framework.enabled_locales)' }}</td>
+            </tr>
+            <tr>
+                <th scope="row">Language the browser asked for</th>
+                <td>{{ collector.preferredLanguage|default('-') }}</td>
+            </tr>
+            <tr>
+                <th scope="row">Route</th>
+                <td>{{ collector.route|default('-') }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>This page in the other locales</h3>
+
+    {% if collector.switches %}
+        <table>
+            <thead>
+                <tr>
+                    <th scope="col">Locale</th>
+                    <th scope="col">Address</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for locale, url in collector.switches %}
+                    <tr>
+                        <td>{{ locale }}{{ locale == collector.locale ? ' (this one)' }}</td>
+                        <td><a href="{{ url }}" hreflang="{{ locale }}">{{ url }}</a></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="empty">
+            <p>The route of this request has no <code>{_locale}</code> in its path: there is no address to give for another locale.</p>
+        </div>
+    {% endif %}
+{% endblock %}
