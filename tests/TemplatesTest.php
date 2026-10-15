@@ -66,4 +66,23 @@ final class TemplatesTest extends TestCase
         yield ['Toolbar/floating.js.twig'];
         yield ['Toolbar/fixes.js.twig'];
     }
+
+    /**
+     * A finger sends no mouse event while it moves: the gestures are pointer
+     * events, and the handle does not scroll the page under the finger.
+     */
+    public function testTheToolbarIsMovedByAFingerAsByTheMouse(): void
+    {
+        $js = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.js.twig');
+        foreach (['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'setPointerCapture'] as $used) {
+            self::assertStringContainsString($used, $js);
+        }
+        foreach (['mousedown', 'mousemove', 'mouseup'] as $unused) {
+            self::assertStringNotContainsString("'".$unused."'", $js);
+        }
+
+        $css = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.css.twig');
+        self::assertMatchesRegularExpression('~\.sf-toolbar-toggle-button\s*\{\s*touch-action:\s*none;~', $css);
+        self::assertStringContainsString('@media (pointer: coarse)', $css);
+    }
 }

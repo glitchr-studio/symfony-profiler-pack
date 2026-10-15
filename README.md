@@ -12,12 +12,13 @@ which installs the profiler itself. This one adds to it.
 ## What it adds
 
 - **A toolbar that floats.** A rounded bar over the page, in place of the strip across its bottom.
-- **Move it.** Hold the handle at its right end and drag. Dragged into the upper half of the window,
-  it opens its details downwards.
+- **Move it.** Hold the handle at its right end and drag, with the mouse or a finger. Dragged into
+  the upper half of the window, it opens its details downwards. On a touch screen the handle is the
+  size of a fingertip.
 - **Resize it.** Pull its left edge. Double-click that edge to fold it to its first block, again to
   unfold.
-- **Send it aside.** Double-click the handle: the toolbar slides off to the left, its handle staying
-  in view; double-click again to bring it back.
+- **Send it aside.** Double-click the handle (double-tap it on a phone): the toolbar slides off to
+  the left, its handle staying in view; do it again to bring it back.
 - **It remembers.** Place and width are kept by the browser, from one page to the next.
 - **A locale block.** The locale of the request, the default one, the timezone, and a link to the
   same page in each other enabled locale when its route has a `{_locale}`.

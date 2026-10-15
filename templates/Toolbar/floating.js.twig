@@ -1,7 +1,10 @@
 {# The floating toolbar's gestures. The handle is the toolbar's own button
    (.sf-toolbar-toggle-button): held and moved, it carries the toolbar; a plain
    click still opens and closes it. The left edge resizes. Place and width are
-   kept in localStorage. The toolbar's content is replaced by every load
+   kept in localStorage. Pointer events, so a finger and a pen do what the
+   mouse does: the handle keeps the pointer while it moves (pointer capture)
+   and is not a place to scroll the page from (touch-action, floating.css); a
+   double tap stands for the double click phones do not reliably send. The toolbar's content is replaced by every load
    (.sf-toolbarreset is a new element each time): it is looked up again on each
    change of the page. #}
 (function () {
@@ -21,6 +24,8 @@
     var THRESHOLD = 5;
     var PADDING = 16;
     var EDGE = 15;
+    var TOUCH_EDGE = 28;
+    var DOUBLE_TAP = 350;   /* ms between the two taps */
     var MIN_WIDTH = 200;
     var FOLDED_WIDTH = 65;
 
@@ -33,6 +38,9 @@
     var resize = null;
     var swallowClick = false;
     var openBeforeClicks = true;
+    var lastDown = 0;
+    var lastTap = null;
+    var tappedFold = 0;
 
     function read(key) {
         try {
@@ -145,35 +153,57 @@
             return false;
         }
         var rect = content.getBoundingClientRect();
+        var edge = 'touch' === event.pointerType ? TOUCH_EDGE : EDGE;
 
-        return event.clientX >= rect.left && event.clientX <= rect.left + EDGE && event.clientY >= rect.top && event.clientY <= rect.bottom;
+        return event.clientX >= rect.left && event.clientX <= rect.left + edge && event.clientY >= rect.top && event.clientY <= rect.bottom;
     }
 
     function onHandle(event) {
         return bar && event.target && event.target.closest && event.target.closest('.sf-toolbar-toggle-button') && bar.contains(event.target);
     }
 
-    document.addEventListener('mousedown', function (event) {
+    document.addEventListener('pointerdown', function (event) {
         if (0 !== event.button || !bar) {
             return;
         }
 
         if (DRAGGABLE && onHandle(event)) {
-            drag = { startX: event.clientX, startY: event.clientY, moved: false };
+            /* The state before the clicks of a double click (or the taps of a double tap), each of which opens or closes the toolbar. */
+            var now = Date.now();
+            if (now - lastDown > DOUBLE_TAP) {
+                openBeforeClicks = !bar.classList.contains('sf-toolbar-closed');
+            }
+            lastDown = now;
+
+            drag = { startX: event.clientX, startY: event.clientY, moved: false, pointer: event.pointerType };
             swallowClick = false;
-            event.preventDefault();
+            if (event.target.setPointerCapture) {
+                try {
+                    event.target.setPointerCapture(event.pointerId);
+                } catch (e) {
+                }
+            }
+            if ('mouse' === event.pointerType) {
+                event.preventDefault();
+            }
 
             return;
         }
 
         if (RESIZABLE && onLeftEdge(event)) {
             resize = { right: content.getBoundingClientRect().right };
+            if (event.target.setPointerCapture) {
+                try {
+                    event.target.setPointerCapture(event.pointerId);
+                } catch (e) {
+                }
+            }
             event.preventDefault();
             event.stopPropagation();
         }
     });
 
-    document.addEventListener('mousemove', function (event) {
+    document.addEventListener('pointermove', function (event) {
         if (drag) {
             var dx = event.clientX - drag.startX;
             var dy = event.clientY - drag.startY;
@@ -192,7 +222,7 @@
         }
     });
 
-    document.addEventListener('mouseup', function (event) {
+    function release(event) {
         if (drag) {
             if (drag.moved) {
                 var placed = place(x + event.clientX - drag.startX, y + event.clientY - drag.startY);
@@ -201,6 +231,17 @@
                 write(POSITION_KEY, JSON.stringify({ x: x, y: y }));
                 swallowClick = true;
                 invert();
+                lastTap = null;
+            } else if (MINIMIZABLE && 'mouse' !== drag.pointer && 'pointerup' === event.type) {
+                /* A double tap on the handle: what a double click does. */
+                var now = Date.now();
+                if (lastTap && now - lastTap.time <= DOUBLE_TAP && Math.abs(event.clientX - lastTap.x) < 30 && Math.abs(event.clientY - lastTap.y) < 30) {
+                    lastTap = null;
+                    tappedFold = now;
+                    foldAside(event.target.closest('.sf-toolbar-toggle-button'));
+                } else {
+                    lastTap = { time: now, x: event.clientX, y: event.clientY };
+                }
             }
             drag = null;
         }
@@ -209,7 +250,10 @@
             write(WIDTH_KEY, String(Math.round(width())));
             resize = null;
         }
-    });
+    }
+
+    document.addEventListener('pointerup', release);
+    document.addEventListener('pointercancel', release);
 
     /* A move that ends on the handle is not a click on it: the toolbar stays open or closed as it was. */
     document.addEventListener('click', function (event) {
@@ -222,13 +266,24 @@
             swallowClick = false;
             event.stopImmediatePropagation();
             event.preventDefault();
-
-            return;
-        }
-        if (1 === event.detail) {
-            openBeforeClicks = !bar.classList.contains('sf-toolbar-closed');
         }
     }, true);
+
+    /* Sent to the side it is farthest from, or back; open or closed as it was before the clicks. */
+    function foldAside(toggle) {
+        var left = -(window.innerWidth - 5 * PADDING);
+        var placed = place(x <= left / 2 ? 0 : left, 0);
+        x = placed.x;
+        y = placed.y;
+        write(POSITION_KEY, JSON.stringify({ x: x, y: y }));
+
+        window.setTimeout(function () {
+            if (toggle && openBeforeClicks === bar.classList.contains('sf-toolbar-closed')) {
+                toggle.click();
+            }
+            invert();
+        }, 0);
+    }
 
     if (MINIMIZABLE) {
         document.addEventListener('dblclick', function (event) {
@@ -237,20 +292,11 @@
             }
 
             if (DRAGGABLE && onHandle(event)) {
-                var left = -(window.innerWidth - 5 * PADDING);
-                var placed = place(x <= left / 2 ? 0 : left, 0);
-                x = placed.x;
-                y = placed.y;
-                write(POSITION_KEY, JSON.stringify({ x: x, y: y }));
-
-                /* The two clicks of a double click are clicks on the toolbar's button too: it is left open or closed as it was before them. */
-                var toggle = event.target.closest('.sf-toolbar-toggle-button');
-                window.setTimeout(function () {
-                    if (openBeforeClicks === bar.classList.contains('sf-toolbar-closed')) {
-                        toggle.click();
-                    }
-                    invert();
-                }, 0);
+                /* Already done by the double tap this double click comes from. */
+                if (Date.now() - tappedFold < 600) {
+                    return;
+                }
+                foldAside(event.target.closest('.sf-toolbar-toggle-button'));
 
                 return;
             }
