@@ -1,0 +1,10 @@
+# Not in the archive a site installs: the tests (their classes, loaded by an
+# application that scans its vendor directory, need PHPUnit and the pack's
+# test application), the documentation's pictures and the CI.
+/tests              export-ignore
+/docs               export-ignore
+/.github            export-ignore
+/.gitattributes     export-ignore
+/.gitignore         export-ignore
+/phpunit.xml.dist   export-ignore
+/composer.lock      export-ignore
