@@ -189,6 +189,39 @@ final class TemplatesTest extends TestCase
         self::assertStringContainsString("tappedFold = now;\n                    clickAfterFold = now;", $js);
     }
 
+    /**
+     * The toolbar covers no control of a panel the page shows over itself (a
+     * cookie question floating at the bottom, a dialog): a layer fixed in the
+     * window found under the toolbar's column, or an open dialog wherever it
+     * is, holding a control. Shown at the nearest height clear of it, the
+     * place asked for kept, it goes back once the panel is closed; a move is
+     * kept clear once let go, not while it is made.
+     */
+    public function testTheToolbarKeepsClearOfThePagesPanels(): void
+    {
+        $js = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.js.twig');
+
+        foreach (['function panels(left, right)', 'function nearestClear(', 'function clearOfPanels(', 'document.querySelectorAll(PANELS)', "'fixed' === window.getComputedStyle(el).position"] as $used) {
+            self::assertStringContainsString($used, $js);
+        }
+        self::assertSame(1, preg_match("~var PANELS = '([^']+)';~", $js, $panels));
+        foreach (['dialog[open]', '[role="dialog"]', '[role="alertdialog"]', '[aria-modal="true"]', '[data-consent-banner]', '[data-cookie-banner]', '[data-toolbar-avoid]'] as $selector) {
+            self::assertStringContainsString($selector, $panels[1]);
+        }
+        self::assertStringContainsString('[tabindex]:not([tabindex="-1"])', $js, 'A panel focusable as a whole is not a control.');
+        self::assertStringContainsString('(rect.width >= width * PAGE && rect.height >= height * PAGE)', $js, 'A page laid out in a fixed layer is not a panel.');
+        self::assertStringContainsString('if (found[i].bottom - found[i].top < window.innerHeight * TALL) {', $js, 'A side rail is kept clear of by its controls, not sent over the top.');
+
+        /* Shown clear of the panels, kept where it was asked. */
+        self::assertStringContainsString("var shown = moving ? clamped : clampPosition(nx, ny, true);\n        bar.style.transform = 'translate(' + shown.x + 'px, ' + shown.y + 'px)';\n        applied = shown;\n\n        return clamped;", $js);
+        self::assertStringContainsString('place(drag.fromX + dx, drag.fromY + dy, true);', $js, 'Not while it is being moved.');
+
+        /* A panel shown or hidden, sliding in, scrolled into view. */
+        self::assertStringContainsString("attributes: true, attributeFilter: ['hidden', 'class', 'open', 'aria-hidden', 'aria-expanded']", $js);
+        self::assertStringContainsString("document.addEventListener('animationend', settle);", $js);
+        self::assertStringContainsString("window.addEventListener('scroll', settle, { passive: true });", $js);
+    }
+
     /** @return array<string, array<string, string>> each selector of a block of rules, with its declarations */
     private static function rulesOf(string $css): array
     {

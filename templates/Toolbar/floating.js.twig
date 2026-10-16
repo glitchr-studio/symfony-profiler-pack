@@ -12,7 +12,19 @@
    handle and its right end never leave it (its body may slide off to the left,
    which is what sending it aside does), it stays inside what the browser shows
    of the page (window.visualViewport: not under a browser's own bottom bar),
-   and above a bar the page keeps fixed along the bottom of the window. #}
+   and above a bar the page keeps fixed along the bottom of the window.
+
+   Nor does it cover what a visitor presses in a panel the page shows over
+   itself: a cookie question floating at the bottom, a dialog, a chat button.
+   Such a panel is a layer of the page fixed in the window, found under the
+   toolbar's column (document.elementsFromPoint), or an open dialog wherever it
+   is laid (dialog[open], role dialog or alertdialog, aria-modal, the banner of
+   a cookie library, data-toolbar-avoid), holding a control. Where the toolbar
+   would cover one, it is shown at the nearest height clear of the panel, up
+   first (of a panel nearly as high as the window, a side rail or a drawer,
+   clear of its controls); when no height is, clear of the controls; when none
+   is either, where it was. The place asked for is left as it was: the panel closed, the
+   toolbar goes back. A move does not jump: it is kept clear once let go. #}
 (function () {
     'use strict';
 
@@ -38,6 +50,12 @@
     var NAV_HEIGHT = 120;   /* px: a bar fixed along the bottom of the window, not a panel */
     var MARGIN = 4;
     var ASIDE = 24;         /* px: a handle this close to the left edge is aside (an open and a closed handle are not as wide) */
+
+    var CONTROLS = 'a[href], button, input, select, textarea, summary, [role="button"], [role="link"], [role="checkbox"], [role="switch"], [contenteditable="true"], [tabindex]:not([tabindex="-1"])';
+    var PANELS = 'dialog[open], [role="dialog"], [role="alertdialog"], [aria-modal="true"], [data-consent-banner], [data-cookie-banner], [data-toolbar-avoid]';
+    var GRID = 32;          /* px between the points a panel is looked for under */
+    var PAGE = 0.9;         /* a fixed layer this much of the window each way is the page laid out in it, not a panel */
+    var TALL = 0.75;        /* a panel this much of the window high (a side rail, a drawer) is kept clear of by its controls only */
 
     var bar = null;
     var content = null;
@@ -152,6 +170,7 @@
         var visible = pill.width && pill.height;
 
         return {
+            left: (visible ? Math.min(pill.left, knob.left) : knob.left) - applied.x,
             handleLeft: knob.left - applied.x,
             right: (visible ? Math.max(pill.right, knob.right) : knob.right) - applied.x,
             top: (visible ? Math.min(pill.top, knob.top) : knob.top) - applied.y,
@@ -159,7 +178,130 @@
         };
     }
 
-    function clampPosition(nx, ny) {
+    function visibleRect(el) {
+        var rect = el.getBoundingClientRect();
+        if (!rect.width || !rect.height || 'hidden' === window.getComputedStyle(el).visibility) {
+            return null;
+        }
+
+        return rect;
+    }
+
+    /* The panels of the page across the toolbar's column, from left to right: each one's top and bottom, and its controls'. */
+    function panels(left, right) {
+        var found = [];
+        var list = [];
+        var seen = [];
+        var width = window.innerWidth;
+        var height = window.innerHeight;
+
+        function across(rect) {
+            return rect.right > left && rect.left < right && rect.bottom > 0 && rect.top < height;
+        }
+
+        function take(el) {
+            if (-1 !== found.indexOf(el) || !bar || bar.contains(el) || el.contains(bar)) {
+                return;
+            }
+            found.push(el);
+            var rect = visibleRect(el);
+            if (!rect || !across(rect) || (rect.width >= width * PAGE && rect.height >= height * PAGE)) {
+                return;
+            }
+            var controls = [];
+            var inside = el.querySelectorAll(CONTROLS);
+            for (var i = 0; i < inside.length; i++) {
+                var control = visibleRect(inside[i]);
+                if (control && across(control) && control.bottom > rect.top && control.top < rect.bottom) {
+                    controls.push({ top: Math.max(control.top, rect.top), bottom: Math.min(control.bottom, rect.bottom) });
+                }
+            }
+            if (controls.length) {
+                list.push({ top: rect.top, bottom: rect.bottom, controls: controls });
+            }
+        }
+
+        var marked = document.querySelectorAll(PANELS);
+        for (var m = 0; m < marked.length; m++) {
+            take(marked[m]);
+        }
+        if (document.elementsFromPoint) {
+            for (var py = GRID / 2; py < height; py += GRID) {
+                for (var c = 0; c <= 4; c++) {
+                    var stack = document.elementsFromPoint(left + 2 + (right - left - 4) * c / 4, py);
+                    for (var j = 0; j < stack.length; j++) {
+                        for (var el = stack[j]; el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
+                            if (-1 !== seen.indexOf(el) || bar.contains(el)) {
+                                break;
+                            }
+                            seen.push(el);
+                            if ('fixed' === window.getComputedStyle(el).position) {
+                                take(el);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return list;
+    }
+
+    /* The nearest height, between minY and maxY, at which the toolbar (top to bottom, moved by y) meets none of the rectangles; null when there is none. */
+    function nearestClear(rects, top, bottom, y, minY, maxY) {
+        var tries = [y];
+        for (var i = 0; i < rects.length; i++) {
+            tries.push(rects[i].top - MARGIN - bottom, rects[i].bottom + MARGIN - top);
+        }
+        var best = null;
+        for (var t = 0; t < tries.length; t++) {
+            var ty = tries[t];
+            if (ty < minY || ty > maxY) {
+                continue;
+            }
+            var clear = true;
+            for (var r = 0; r < rects.length && clear; r++) {
+                clear = !(top + ty < rects[r].bottom && bottom + ty > rects[r].top);
+            }
+            if (clear && (null === best || Math.abs(ty - y) < Math.abs(best - y) || (Math.abs(ty - y) === Math.abs(best - y) && ty < best))) {
+                best = ty;
+            }
+        }
+
+        return best;
+    }
+
+    /* Where the toolbar, at (nx, ny), covers no control of a panel of the page: clear of the panels, else of their controls, else where it was. */
+    function clearOfPanels(box, nx, ny, minY, maxY) {
+        var left = Math.max(0, box.left + nx);
+        var right = Math.min(window.innerWidth, box.right + nx);
+        if (right <= left) {
+            return ny;
+        }
+        var found = panels(left, right);
+        if (!found.length) {
+            return ny;
+        }
+        var whole = [];
+        var controls = [];
+        for (var i = 0; i < found.length; i++) {
+            if (found[i].bottom - found[i].top < window.innerHeight * TALL) {
+                whole.push(found[i]);
+            } else {
+                whole = whole.concat(found[i].controls);
+            }
+            controls = controls.concat(found[i].controls);
+        }
+        var y = nearestClear(whole, box.top, box.bottom, ny, minY, maxY);
+        if (null === y) {
+            y = nearestClear(controls, box.top, box.bottom, ny, minY, maxY);
+        }
+
+        return null === y ? ny : y;
+    }
+
+    function clampPosition(nx, ny, clear) {
         var box = bounds();
         if (!box) {
             return { x: nx, y: ny };
@@ -168,10 +310,12 @@
         var maxX = Math.max(minX, window.innerWidth - MARGIN - box.right);
         var minY = MARGIN - box.top;
         var maxY = Math.max(minY, floor() - box.bottom);
+        var cx = Math.min(maxX, Math.max(minX, nx));
+        var cy = Math.min(maxY, Math.max(minY, ny));
 
         return {
-            x: Math.min(maxX, Math.max(minX, nx)),
-            y: Math.min(maxY, Math.max(minY, ny))
+            x: cx,
+            y: clear ? clearOfPanels(box, cx, cy, minY, maxY) : cy
         };
     }
 
@@ -179,10 +323,12 @@
         return Math.min(Math.max(fullWidth, MIN_WIDTH), Math.max(FOLDED_WIDTH, width));
     }
 
-    function place(nx, ny) {
-        var clamped = clampPosition(nx, ny);
-        bar.style.transform = 'translate(' + clamped.x + 'px, ' + clamped.y + 'px)';
-        applied = clamped;
+    /* Shown at (nx, ny), in the window; kept clear of the page's panels but while it is being moved. Returns the place in the window, the one to keep. */
+    function place(nx, ny, moving) {
+        var clamped = clampPosition(nx, ny, false);
+        var shown = moving ? clamped : clampPosition(nx, ny, true);
+        bar.style.transform = 'translate(' + shown.x + 'px, ' + shown.y + 'px)';
+        applied = shown;
 
         return clamped;
     }
@@ -316,7 +462,7 @@
                 return;
             }
             drag.moved = true;
-            place(drag.fromX + dx, drag.fromY + dy);
+            place(drag.fromX + dx, drag.fromY + dy, true);
             invert();
 
             return;
@@ -434,21 +580,25 @@
         window.visualViewport.addEventListener('resize', settle);
     }
 
-    /* Opened, closed, filled: the toolbar changes size, measured once its transitions are over; a bar of the page comes and goes. */
+    /* Opened, closed, filled: the toolbar changes size, measured once its transitions are over; a bar or a panel of the page comes and goes, shown or hidden, slides in, scrolls into view. */
     document.addEventListener('click', function (event) {
         if (onHandle(event)) {
             settle();
         }
     });
-    document.addEventListener('transitionend', function (event) {
-        if (bar && event.target && bar.contains(event.target)) {
-            settle();
-        }
-    });
+    document.addEventListener('transitionend', settle);
+    document.addEventListener('animationend', settle);
+    window.addEventListener('scroll', settle, { passive: true });
 
     acquire();
-    new MutationObserver(function () {
-        acquire();
-        settle();
-    }).observe(document.documentElement, { childList: true, subtree: true });
+    new MutationObserver(function (records) {
+        for (var i = 0; i < records.length; i++) {
+            if ('attributes' !== records[i].type || !bar || !bar.contains(records[i].target)) {
+                acquire();
+                settle();
+
+                return;
+            }
+        }
+    }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'class', 'open', 'aria-hidden', 'aria-expanded'] });
 })();

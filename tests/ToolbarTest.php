@@ -174,6 +174,20 @@ final class ToolbarTest extends PackTestCase
         self::assertGreaterThan(0, $blocks->filter('.sf-toolbar-toggle-button')->count(), 'The handle is Symfony\'s own button, loaded into #sfwdt….');
     }
 
+    /** The test application's cookie question: a dialog fixed at the bottom, over the navigation along it, which the toolbar keeps clear of. */
+    public function testTheCookiePanelPageShowsAPanelToKeepClearOf(): void
+    {
+        $client = self::client();
+        $crawler = $client->request('GET', '/en/page/cookie-panel');
+
+        $panel = $crawler->filter('#cookie-panel[role="dialog"]');
+        self::assertCount(1, $panel);
+        self::assertStringContainsString('position: fixed', (string) $panel->attr('style'));
+        self::assertCount(3, $panel->filter('button'));
+        self::assertCount(1, $crawler->filter('#bottom-nav'));
+        self::assertStringContainsString('function clearOfPanels(', self::toolbarOf($client));
+    }
+
     public function testThePhoneLayoutIsPartOfTheFloatingToolbar(): void
     {
         $client = self::client();
