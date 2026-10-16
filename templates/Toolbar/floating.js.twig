@@ -4,9 +4,15 @@
    kept in localStorage. Pointer events, so a finger and a pen do what the
    mouse does: the handle keeps the pointer while it moves (pointer capture)
    and is not a place to scroll the page from (touch-action, floating.css); a
-   double tap stands for the double click phones do not reliably send. The toolbar's content is replaced by every load
-   (.sf-toolbarreset is a new element each time): it is looked up again on each
-   change of the page. #}
+   double tap stands for the double click phones do not reliably send. The
+   toolbar's content is replaced by every load (.sf-toolbarreset is a new
+   element each time): it is looked up again on each change of the page.
+
+   Wherever it is put, kept or restored, the toolbar stays in the window: its
+   handle and its right end never leave it (its body may slide off to the left,
+   which is what sending it aside does), it stays inside what the browser shows
+   of the page (window.visualViewport: not under a browser's own bottom bar),
+   and above a bar the page keeps fixed along the bottom of the window. #}
 (function () {
     'use strict';
 
@@ -29,8 +35,13 @@
     var MIN_WIDTH = 200;
     var FOLDED_WIDTH = 65;
 
+    var NAV_HEIGHT = 120;   /* px: a bar fixed along the bottom of the window, not a panel */
+    var MARGIN = 4;
+
     var bar = null;
     var content = null;
+    var applied = { x: 0, y: 0 };
+    var settling = false;
     var fullWidth = 0;
     var x = 0;
     var y = 0;
@@ -79,14 +90,86 @@
         return content.offsetWidth - chrome();
     }
 
-    function clampPosition(nx, ny) {
-        var height = bar.getBoundingClientRect().height;
-        var minX = -(window.innerWidth - 5 * PADDING);
-        var minY = -(window.innerHeight - height - 2 * PADDING);
+    function handle() {
+        return bar ? bar.querySelector('.sf-toolbar-toggle-button') : null;
+    }
+
+    /* The height of a bar the page keeps fixed along the bottom of the window (a navigation, a player): wide, low, touching the bottom. */
+    function pageBottomBar() {
+        var lift = 0;
+        var height = window.innerHeight;
+        var seen = [];
+        if (!document.elementsFromPoint) {
+            return 0;
+        }
+        for (var i = 1; i <= 3; i++) {
+            var stack = document.elementsFromPoint(window.innerWidth * i / 4, height - 2);
+            for (var j = 0; j < stack.length; j++) {
+                for (var el = stack[j]; el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
+                    if (-1 !== seen.indexOf(el) || (bar && bar.contains(el))) {
+                        break;
+                    }
+                    seen.push(el);
+                    if ('fixed' !== window.getComputedStyle(el).position) {
+                        continue;
+                    }
+                    var rect = el.getBoundingClientRect();
+                    if (rect.bottom >= height - MARGIN && rect.width >= window.innerWidth / 2 && rect.height > 0 && rect.height <= Math.min(NAV_HEIGHT, height / 4)) {
+                        lift = Math.max(lift, height - rect.top);
+                    }
+                    break;
+                }
+            }
+        }
+
+        return lift;
+    }
+
+    /* The lowest line the toolbar may reach: the bottom of what the browser shows, above the page's own bottom bar. */
+    function floor() {
+        var bottom = window.innerHeight;
+        var viewport = window.visualViewport;
+        if (viewport && Math.abs(viewport.scale - 1) < 0.01) {
+            bottom = Math.min(bottom, viewport.offsetTop + viewport.height);
+        }
+
+        return Math.min(bottom, window.innerHeight - pageBottomBar()) - MARGIN;
+    }
+
+    /* The toolbar where it would be without any move: its pill and its handle, the transform taken off. */
+    function bounds() {
+        var toggle = handle();
+        if (!bar || !content || !toggle) {
+            return null;
+        }
+        var pill = content.getBoundingClientRect();
+        var knob = toggle.getBoundingClientRect();
+        if (!knob.width || !knob.height) {
+            return null;
+        }
+        var visible = pill.width && pill.height;
 
         return {
-            x: Math.min(2 * PADDING, Math.max(minX, nx)),
-            y: Math.min(0, Math.max(Math.min(0, minY), ny))
+            handleLeft: knob.left - applied.x,
+            right: (visible ? Math.max(pill.right, knob.right) : knob.right) - applied.x,
+            top: (visible ? Math.min(pill.top, knob.top) : knob.top) - applied.y,
+            bottom: (visible ? Math.max(pill.bottom, knob.bottom) : knob.bottom) - applied.y
+        };
+    }
+
+    function clampPosition(nx, ny) {
+        var box = bounds();
+        if (!box) {
+            return { x: nx, y: ny };
+        }
+        var minX = MARGIN - box.handleLeft;
+        var maxX = Math.max(minX, window.innerWidth - MARGIN - box.right);
+        var minY = MARGIN - box.top;
+        var maxY = Math.max(minY, floor() - box.bottom);
+
+        return {
+            x: Math.min(maxX, Math.max(minX, nx)),
+            y: Math.min(maxY, Math.max(minY, ny))
         };
     }
 
@@ -97,8 +180,25 @@
     function place(nx, ny) {
         var clamped = clampPosition(nx, ny);
         bar.style.transform = 'translate(' + clamped.x + 'px, ' + clamped.y + 'px)';
+        applied = clamped;
 
         return clamped;
+    }
+
+    /* Put back inside the window after it, the page or the toolbar changed; the place kept is left as it was. */
+    function settle() {
+        if (settling) {
+            return;
+        }
+        settling = true;
+        window.requestAnimationFrame(function () {
+            settling = false;
+            if (!bar || drag) {
+                return;
+            }
+            place(x, y);
+            invert();
+        });
     }
 
     function invert() {
@@ -120,9 +220,10 @@
             position = JSON.parse(read(POSITION_KEY));
         } catch (e) {
         }
-        var placed = place(DRAGGABLE && position ? Number(position.x) || 0 : 0, DRAGGABLE && position ? Number(position.y) || 0 : 0);
-        x = placed.x;
-        y = placed.y;
+        /* The place asked for is kept as it was asked; where it is shown may be nearer (a smaller window, a bar of the page). */
+        x = DRAGGABLE && position ? Number(position.x) || 0 : 0;
+        y = DRAGGABLE && position ? Number(position.y) || 0 : 0;
+        place(x, y);
 
         invert();
     }
@@ -139,6 +240,8 @@
 
         bar = currentBar;
         content = currentContent;
+        applied = { x: 0, y: 0 };
+        bar.style.transform = '';
 
         var written = content.style.width;
         content.style.width = '';
@@ -175,7 +278,7 @@
             }
             lastDown = now;
 
-            drag = { startX: event.clientX, startY: event.clientY, moved: false, pointer: event.pointerType };
+            drag = { startX: event.clientX, startY: event.clientY, fromX: applied.x, fromY: applied.y, moved: false, pointer: event.pointerType };
             swallowClick = false;
             if (event.target.setPointerCapture) {
                 try {
@@ -211,7 +314,7 @@
                 return;
             }
             drag.moved = true;
-            place(x + dx, y + dy);
+            place(drag.fromX + dx, drag.fromY + dy);
             invert();
 
             return;
@@ -225,7 +328,7 @@
     function release(event) {
         if (drag) {
             if (drag.moved) {
-                var placed = place(x + event.clientX - drag.startX, y + event.clientY - drag.startY);
+                var placed = place(drag.fromX + event.clientX - drag.startX, drag.fromY + event.clientY - drag.startY);
                 x = placed.x;
                 y = placed.y;
                 write(POSITION_KEY, JSON.stringify({ x: x, y: y }));
@@ -269,19 +372,20 @@
         }
     }, true);
 
-    /* Sent to the side it is farthest from, or back; open or closed as it was before the clicks. */
+    /* Sent to the left edge, its handle staying in view, or back; open or closed as it was before the clicks. */
     function foldAside(toggle) {
-        var left = -(window.innerWidth - 5 * PADDING);
-        var placed = place(x <= left / 2 ? 0 : left, 0);
+        var box = bounds();
+        var left = box ? MARGIN - box.handleLeft : -(window.innerWidth - 5 * PADDING);
+        var placed = place(applied.x <= left / 2 ? 0 : left, 0);
         x = placed.x;
-        y = placed.y;
+        y = 0;
         write(POSITION_KEY, JSON.stringify({ x: x, y: y }));
 
         window.setTimeout(function () {
             if (toggle && openBeforeClicks === bar.classList.contains('sf-toolbar-closed')) {
                 toggle.click();
             }
-            invert();
+            settle();
         }, 0);
     }
 
@@ -312,16 +416,26 @@
         });
     }
 
-    window.addEventListener('resize', function () {
-        if (!bar) {
-            return;
+    window.addEventListener('resize', settle);
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', settle);
+    }
+
+    /* Opened, closed, filled: the toolbar changes size, measured once its transitions are over; a bar of the page comes and goes. */
+    document.addEventListener('click', function (event) {
+        if (onHandle(event)) {
+            settle();
         }
-        var placed = place(x, y);
-        x = placed.x;
-        y = placed.y;
-        invert();
+    });
+    document.addEventListener('transitionend', function (event) {
+        if (bar && event.target && bar.contains(event.target)) {
+            settle();
+        }
     });
 
     acquire();
-    new MutationObserver(acquire).observe(document.documentElement, { childList: true, subtree: true });
+    new MutationObserver(function () {
+        acquire();
+        settle();
+    }).observe(document.documentElement, { childList: true, subtree: true });
 })();

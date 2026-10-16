@@ -513,3 +513,82 @@ padding:0;
     top: 35px;
     border-radius: 0 1em 1em 1em;
 }
+
+/* A narrow window or a finger: the toolbar is one piece. The handle is the
+   right end of the pill, not a box beside it, so it can neither come apart
+   from the pill nor be pushed out of the window; the pill spans the window,
+   its blocks scroll sideways inside it and end where the handle starts, and it
+   sits above the bottom of the screen a phone keeps for itself
+   (env(safe-area-inset-bottom)). Closed, the handle alone is left, in the
+   bottom right corner. */
+@media (max-width: 767px), (pointer: coarse) {
+    .sf-toolbar {
+        --profiler-pack-handle: 36px;
+        --profiler-pack-grip: 22px;
+        left: calc(0.75em + env(safe-area-inset-left, 0px));
+        right: calc(0.75em + env(safe-area-inset-right, 0px));
+        bottom: 0;
+        margin: 0 0 calc(0.75em + env(safe-area-inset-bottom, 0px)) 0;
+    }
+    .sf-toolbar .sf-toolbarreset {
+        box-sizing: content-box;
+        width: auto;
+        max-width: calc(100% - 1em - var(--profiler-pack-handle) - var(--profiler-pack-grip));
+        margin: 0 calc(var(--profiler-pack-handle) + var(--profiler-pack-grip)) 0 auto;
+        padding: 0.25em 0 0.25em 1em;
+        border-radius: 1em 0 0 1em;
+        overflow-x: auto;
+        overflow-y: hidden;
+        /* Opened or closed at once: the handle stays under the finger for the second tap. */
+        transition: none;
+    }
+    .sf-toolbar:not(.sf-toolbar-closed) .sf-toolbarreset .sf-toolbar-toggle-button {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: var(--profiler-pack-handle);
+        height: auto;
+        margin: 0;
+        padding: 0 var(--profiler-pack-grip) 0 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #222C;
+        border-radius: 0 1em 1em 0;
+        box-shadow: inset 0 1px 0 #222C, 0 -1px 0 rgba(0, 0, 0, 0.5);
+    }
+    .sf-toolbar.sf-toolbar-closed {
+        left: auto;
+    }
+    .sf-toolbar.sf-toolbar-closed .sf-toolbarreset {
+        width: auto !important;
+        max-width: none;
+        margin: 0;
+        padding: 0;
+        overflow: visible;
+        background-color: transparent;
+        box-shadow: none;
+    }
+    .sf-toolbar.sf-toolbar-closed .sf-toolbarreset .sf-toolbar-toggle-button {
+        position: relative;
+        top: auto;
+        right: auto;
+        margin: 0;
+    }
+    /* A block's details: from the pill's left end, never wider than it. */
+    .sf-toolbar .sf-toolbar-block:hover .sf-toolbar-info,
+    .sf-toolbar .sf-toolbar-block.hover .sf-toolbar-info {
+        left: 0 !important;
+        right: auto;
+        max-width: 100% !important;
+        overflow-x: auto;
+    }
+}
+
+@media (pointer: coarse) {
+    .sf-toolbar {
+        --profiler-pack-handle: 48px;
+        --profiler-pack-grip: 30px;
+    }
+}

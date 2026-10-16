@@ -144,4 +144,45 @@ final class ToolbarTest extends PackTestCase
 
         self::assertStringNotContainsString('profiler-pack: the profiler\'s pages take the width of the window', (string) $client->getResponse()->getContent());
     }
+
+    /**
+     * Everything of the pack a visitor can click is inside the toolbar's own
+     * element (.sf-toolbar, #sfwdt…): a page that tells its own clicks from the
+     * toolbar's by those selectors (omnibase/consent does) needs nothing more.
+     */
+    public function testWhatThePackAddsIsInsideTheToolbar(): void
+    {
+        $client = self::client();
+        $client->request('GET', '/en/page');
+
+        /* What is left once the scripts, the styles and the stylesheet link are taken out: one element, the toolbar's. */
+        $markup = trim((string) preg_replace(['~<script\b.*?</script>~s', '~<style\b.*?</style>~s', '~<link\b[^>]*>~', '~<!--.*?-->~s'], '', self::toolbarOf($client)));
+        self::assertMatchesRegularExpression('~^<div class="sf-toolbar[ "]~', $markup);
+        self::assertStringEndsWith('</div>', $markup);
+
+        preg_match_all('~<(/?)div\b~', $markup, $tags, \PREG_OFFSET_CAPTURE);
+        $depth = 0;
+        foreach ($tags[1] as $index => [$closing]) {
+            $depth += '' === $closing ? 1 : -1;
+            if (0 === $depth) {
+                self::assertSame(\count($tags[1]) - 1, $index, 'Nothing of the toolbar is laid in the page outside .sf-toolbar.');
+            }
+        }
+        self::assertSame(0, $depth);
+
+        $blocks = new \Symfony\Component\DomCrawler\Crawler(self::blocksOf($client));
+        self::assertGreaterThan(0, $blocks->filter('.sf-toolbar-toggle-button')->count(), 'The handle is Symfony\'s own button, loaded into #sfwdt….');
+    }
+
+    public function testThePhoneLayoutIsPartOfTheFloatingToolbar(): void
+    {
+        $client = self::client();
+        $client->request('GET', '/en/page');
+        self::assertStringContainsString('function pageBottomBar()', self::toolbarOf($client));
+        self::assertStringContainsString('@media (max-width: 767px), (pointer: coarse)', self::stylesOf($client));
+
+        $client = self::client(['floating' => false]);
+        $client->request('GET', '/en/page');
+        self::assertStringNotContainsString('--profiler-pack-handle', self::stylesOf($client));
+    }
 }

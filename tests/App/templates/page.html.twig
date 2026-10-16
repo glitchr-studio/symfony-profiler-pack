@@ -16,6 +16,7 @@
         <li><a href="{{ path('page', {_locale: 'en'}) }}">English</a>, <a href="{{ path('page', {_locale: 'fr'}) }}">French</a>, <a href="{{ path('page', {_locale: 'de', slug: 'about', page: 2}) }}">German, "about", page 2</a></li>
         <li><a href="{{ path('plain') }}">A page whose route has no locale</a></li>
         <li><a href="{{ path('failing') }}">A page that fails</a></li>
+        <li><a href="{{ path('page', {_locale: 'en', slug: 'bottom-nav'}) }}">A page with a navigation fixed along the bottom of the window</a></li>
     </ul>
     <p><button type="button" class="btn btn--neutral" id="ajax">Send an AJAX request</button> <output id="answer"></output></p>
     <script>
@@ -27,6 +28,12 @@
             xhr.send();
         });
     </script>
+    {% if 'bottom-nav' == slug %}
+    {# A phone's tab bar: the toolbar's place is above it. #}
+    <nav id="bottom-nav" style="position: fixed; left: 0; right: 0; bottom: 0; height: 56px; display: flex; justify-content: space-around; align-items: center; background: #f4efe6; border-top: 1px solid #ccc;">
+        <a href="{{ path('page', {_locale: 'en'}) }}">Home</a> <a href="{{ path('plain') }}">Plain</a> <a href="#">Info</a>
+    </nav>
+    {% endif %}
     <!-- end of the page -->
 </body>
 </html>
