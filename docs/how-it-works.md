@@ -46,11 +46,39 @@ The position kept is the one asked for. Where the toolbar is shown may be nearer
 - it stays above a bar the page keeps fixed along the bottom of the window. Such a bar is found under
   three points of the window's last line (`document.elementsFromPoint`): a `position: fixed` element
   touching the bottom, at least half the window wide and at most 120px (and a quarter of the window)
-  high. A taller one is a panel, not a bar, and the toolbar may cover it; drag it away.
+  high. A taller one is a panel, not a bar: the toolbar keeps clear of it as below.
 
-The toolbar is put back inside on every change: a resized window, a toolbar opened, closed or filled
-(once its transitions are over), a bar of the page that comes or goes. A bar that goes takes the
-toolbar back down with it: the place asked for was kept.
+## Clear of the page's panels
+
+The toolbar never covers what a visitor presses in a panel the page shows over itself: a cookie
+question floating at the bottom of the window (omnibase/consent's), a dialog, a chat button. A panel is
+
+- a layer of the page fixed in the window (`position: fixed`), found under the toolbar's column: five
+  points across its width, every 32px down the window (`document.elementsFromPoint`), the nearest
+  fixed element above what is there;
+- or an open dialog wherever it is laid, even scrolling with the page: `dialog[open]`,
+  `[role="dialog"]`, `[role="alertdialog"]`, `[aria-modal="true"]`, the banner of a cookie library
+  (`[data-consent-banner]`, `[data-cookie-banner]`: @glitchr/flowjs/cookie's, under either prefix),
+  and anything a page marks `data-toolbar-avoid`;
+
+shown, across the toolbar's width, and holding a control (a link, a button, a field, a `summary`, an
+element a keyboard reaches). A fixed layer of nearly the whole window (90% each way) is the page laid
+out in it, not a panel.
+
+Where the toolbar would cover one, it is shown at the nearest height where it covers none, upwards
+first (the question at the bottom: the toolbar just above it). A panel nearly as high as the window
+(75%: a side rail, a drawer) is kept clear of by its controls only, so the toolbar is not sent over
+the top of the window for a rail along its side. When no height is clear of the panels, the toolbar
+keeps clear of their controls alone; when none is either, it stays where it was. Its width and its
+place across are left as they are, and so is the place asked for: the question answered, the toolbar
+goes back down. While it is dragged it goes where the pointer takes it, over a panel too; let go, it
+is shown clear of it.
+
+The toolbar is put back inside on every change: a resized window, a scrolled page, a toolbar opened,
+closed or filled (once its transitions are over), a bar or a panel of the page that comes or goes,
+is shown or hidden (`hidden`, `class`, `open`, `aria-hidden`, `aria-expanded`), or has slid in (the
+end of a transition or an animation). A bar or a panel that goes takes the toolbar back down with it:
+the place asked for was kept.
 
 ## On a narrow window or under a finger
 

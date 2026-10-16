@@ -23,6 +23,9 @@ which installs the profiler itself. This one adds to it.
 - **It stays in the window.** Wherever it is dragged, kept or restored (a place kept on a wide screen,
   read on a phone), its handle and its right end stay in view, inside what the browser shows of the
   page, and above a bar the page keeps fixed along the bottom of the window (a tab bar, a player).
+- **It covers no button of the page's panels.** A cookie question floating at the bottom, a dialog, a
+  chat button: the toolbar is shown just above it (or at the nearest height clear of it) while it is
+  open, and goes back once it is closed. A page can mark anything else with `data-toolbar-avoid`.
 - **On a phone, one piece.** Below 768px, or under a finger, the handle is the right end of the pill
   rather than a box beside it; the pill spans the window, its blocks scroll sideways, and it keeps
   clear of the bottom a phone keeps for itself (`env(safe-area-inset-bottom)`). Closed, the handle
@@ -115,7 +118,9 @@ php -S localhost:8000 -t tests/App/public tests/App/public/index.php
 ```
 
 `/en/page/bottom-nav` is a page with a navigation fixed along the bottom of the window, to see the
-toolbar keep above it.
+toolbar keep above it; `/en/page/cookie-panel` adds a cookie question floating over that navigation,
+to see the toolbar keep clear of its buttons, open them out ("Customise") and come back down once it
+is answered.
 
 ## Licence
 
