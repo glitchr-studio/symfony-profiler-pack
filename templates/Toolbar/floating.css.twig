@@ -586,9 +586,15 @@ padding:0;
     }
 }
 
+/* Under a finger the pill, and so the handle that spans its height, is
+   48px high: a fingertip's target (Material 48, Apple and WCAG 44). */
 @media (pointer: coarse) {
     .sf-toolbar {
         --profiler-pack-handle: 48px;
         --profiler-pack-grip: 30px;
+    }
+    .sf-toolbar:not(.sf-toolbar-closed) .sf-toolbarreset {
+        min-height: calc(48px - 0.5em);
+        align-items: center;
     }
 }

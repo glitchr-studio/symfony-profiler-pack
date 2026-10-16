@@ -37,6 +37,7 @@
 
     var NAV_HEIGHT = 120;   /* px: a bar fixed along the bottom of the window, not a panel */
     var MARGIN = 4;
+    var ASIDE = 24;         /* px: a handle this close to the left edge is aside (an open and a closed handle are not as wide) */
 
     var bar = null;
     var content = null;
@@ -52,6 +53,7 @@
     var lastDown = 0;
     var lastTap = null;
     var tappedFold = 0;
+    var clickAfterFold = 0;
 
     function read(key) {
         try {
@@ -341,6 +343,7 @@
                 if (lastTap && now - lastTap.time <= DOUBLE_TAP && Math.abs(event.clientX - lastTap.x) < 30 && Math.abs(event.clientY - lastTap.y) < 30) {
                     lastTap = null;
                     tappedFold = now;
+                    clickAfterFold = now;
                     foldAside(event.target.closest('.sf-toolbar-toggle-button'));
                 } else {
                     lastTap = { time: now, x: event.clientX, y: event.clientY };
@@ -358,6 +361,15 @@
     document.addEventListener('pointerup', release);
     document.addEventListener('pointercancel', release);
 
+    /* The click a phone sends after the second tap of a double tap lands where the handle was: the toolbar has moved away by then, so it would reach the page under it (a link, a cookie panel). It reaches nothing; the toolbar's state is set by foldAside. Caught on the window, before any listener of the page. */
+    window.addEventListener('click', function (event) {
+        if (clickAfterFold && event.isTrusted && Date.now() - clickAfterFold < 700) {
+            clickAfterFold = 0;
+            event.stopImmediatePropagation();
+            event.preventDefault();
+        }
+    }, true);
+
     /* A move that ends on the handle is not a click on it: the toolbar stays open or closed as it was. */
     document.addEventListener('click', function (event) {
         if (!onHandle(event)) {
@@ -372,11 +384,12 @@
         }
     }, true);
 
-    /* Sent to the left edge, its handle staying in view, or back; open or closed as it was before the clicks. */
+    /* Sent to the left edge, its handle staying in view; back to its corner when it is there already. Open or closed as it was before the clicks. */
     function foldAside(toggle) {
         var box = bounds();
         var left = box ? MARGIN - box.handleLeft : -(window.innerWidth - 5 * PADDING);
-        var placed = place(applied.x <= left / 2 ? 0 : left, 0);
+        var aside = applied.x <= left + ASIDE;
+        var placed = place(aside ? 0 : left, 0);
         x = placed.x;
         y = 0;
         write(POSITION_KEY, JSON.stringify({ x: x, y: y }));

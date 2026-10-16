@@ -141,6 +141,54 @@ final class TemplatesTest extends TestCase
         self::assertStringNotContainsString('Math.min(2 * PADDING', $js, 'The old bound let the handle out on the right.');
     }
 
+    /**
+     * Under a finger the handle is a fingertip's target: at least 44px each way
+     * (Apple, WCAG; Material asks 48), open as closed.
+     */
+    public function testUnderAFingerTheHandleIsAFingertipsTarget(): void
+    {
+        $css = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.css.twig');
+        $css = preg_replace(['~\{#.*?#\}~s', '~/\*.*?\*/~s'], '', $css);
+
+        self::assertSame(2, preg_match_all('~@media \(pointer: coarse\) \{(.*?)\n\}~s', $css, $blocks));
+        $coarse = self::rulesOf($blocks[1][1]);
+
+        self::assertGreaterThanOrEqual(44, (int) $coarse['.sf-toolbar']['--profiler-pack-handle'], 'Wide enough.');
+        self::assertSame('calc(48px - 0.5em)', $coarse['.sf-toolbar:not(.sf-toolbar-closed) .sf-toolbarreset']['min-height'], 'High enough: the handle spans the pill, 48px with its padding.');
+
+        self::assertSame(1, preg_match('~@media \(max-width: 767px\), \(pointer: coarse\) \{(.*?)\n\}~s', $css, $narrow));
+        $rules = self::rulesOf($narrow[1]);
+        self::assertSame('0.25em 0 0.25em 1em', $rules['.sf-toolbar .sf-toolbarreset']['padding'], 'The 0.5em taken off the 48px.');
+        self::assertSame('content-box', $rules['.sf-toolbar .sf-toolbarreset']['box-sizing']);
+        self::assertSame('0', $rules['.sf-toolbar:not(.sf-toolbar-closed) .sf-toolbarreset .sf-toolbar-toggle-button']['top']);
+        self::assertSame('0', $rules['.sf-toolbar:not(.sf-toolbar-closed) .sf-toolbarreset .sf-toolbar-toggle-button']['bottom']);
+
+        self::assertSame(1, preg_match('~@media \(pointer: coarse\) \{(.*?)\n\}~s', $css, $first));
+        $closed = self::rulesOf($first[1])['.sf-toolbar.sf-toolbar-closed .sf-toolbarreset .sf-toolbar-toggle-button'];
+        self::assertGreaterThanOrEqual(44, (int) $closed['height']);
+        self::assertGreaterThanOrEqual(44, (int) $closed['width']);
+    }
+
+    /**
+     * A double tap (or click) on the handle sends the toolbar aside, to the
+     * left edge with its handle in view, from wherever it is; once it is
+     * there, the next one brings it back to its corner.
+     */
+    public function testADoubleTapSendsTheToolbarAsideThenBack(): void
+    {
+        $js = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.js.twig');
+
+        self::assertStringContainsString('var left = box ? MARGIN - box.handleLeft : -(window.innerWidth - 5 * PADDING);', $js, 'Aside: the handle at the left edge.');
+        self::assertStringContainsString('var aside = applied.x <= left + ASIDE;', $js, 'Back only from there, not from half way.');
+        self::assertStringContainsString('var placed = place(aside ? 0 : left, 0);', $js);
+        self::assertStringNotContainsString('left / 2', $js, 'A toolbar dragged half way left was taken for aside and sent back.');
+        self::assertSame(2, substr_count($js, 'foldAside(event.target.closest(\'.sf-toolbar-toggle-button\'));'), 'From a double tap and from a double click.');
+
+        /* The click a phone sends after the second tap lands where the handle was, on the page under it by then. */
+        self::assertSame(1, preg_match("~window\\.addEventListener\\('click', function \\(event\\) \\{\\s*if \\(clickAfterFold && event\\.isTrusted && Date\\.now\\(\\) - clickAfterFold < \\d+\\) \\{\\s*clickAfterFold = 0;\\s*event\\.stopImmediatePropagation\\(\\);\\s*event\\.preventDefault\\(\\);~", $js), 'It reaches nothing, caught on the window before any listener of the page.');
+        self::assertStringContainsString("tappedFold = now;\n                    clickAfterFold = now;", $js);
+    }
+
     /** @return array<string, array<string, string>> each selector of a block of rules, with its declarations */
     private static function rulesOf(string $css): array
     {

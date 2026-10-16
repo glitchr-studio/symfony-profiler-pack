@@ -60,7 +60,14 @@ margin, which a phone's width pushed apart and out of the window. The pill spans
 safe areas (`env(safe-area-inset-left|right|bottom)`), ends where the handle starts, and its blocks
 scroll sideways inside it. A block's details open from the pill's left end, never wider than it.
 Closed, the handle alone is the toolbar, in the bottom right corner. Opening and closing are not
-animated there: the handle stays under the finger for the second tap of a double tap.
+animated there: the handle stays under the finger for the second tap of a double tap. Under a finger
+the pill is 48px high, and the handle, which spans it, 48px wide: a fingertip's target (Material 48,
+Apple and WCAG 44), open as closed.
+
+A double tap on the handle sends the toolbar aside, to the left edge with its handle in view, from
+wherever it is; from there, the next one brings it back to its corner. The click a phone sends after
+the second tap lands where the handle was, on the page under it by then (a link, a cookie panel): the
+pack catches it on the window, before any listener of the page, and lets it reach nothing.
 
 ## Inside the toolbar's element
 
