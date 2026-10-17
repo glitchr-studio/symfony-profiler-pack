@@ -24,7 +24,11 @@
    first (of a panel nearly as high as the window, a side rail or a drawer,
    clear of its controls); when no height is, clear of the controls; when none
    is either, where it was. The place asked for is left as it was: the panel closed, the
-   toolbar goes back. A move does not jump: it is kept clear once let go. #}
+   toolbar goes back. A move does not jump: it is kept clear once let go.
+
+   At the end of the page, where nothing scrolls out from under it any more, it
+   covers no control of the page itself either (a link of the footer, a cookie
+   circle there), kept clear of each the same way. #}
 (function () {
     'use strict';
 
@@ -245,7 +249,28 @@
             }
         }
 
+        /* At the end of the page nothing scrolls out from under the toolbar any more: a control of the page itself (a link of the footer, its cookie circle) is kept clear of too, each one a panel of its own. Before the end, the page's controls pass under it as it scrolls, and it stays where it is. */
+        if (atPageEnd()) {
+            var own = document.querySelectorAll(CONTROLS);
+            for (var k = 0; k < own.length; k++) {
+                if (bar.contains(own[k])) {
+                    continue;
+                }
+                var rect = visibleRect(own[k]);
+                if (rect && across(rect)) {
+                    list.push({ top: rect.top, bottom: rect.bottom, controls: [{ top: rect.top, bottom: rect.bottom }] });
+                }
+            }
+        }
+
         return list;
+    }
+
+    /* The page shows its end: scrolled to the bottom, or no taller than the window. */
+    function atPageEnd() {
+        var root = document.scrollingElement || document.documentElement;
+
+        return window.scrollY + window.innerHeight >= root.scrollHeight - 2;
     }
 
     /* The nearest height, between minY and maxY, at which the toolbar (top to bottom, moved by y) meets none of the rectangles; null when there is none. */

@@ -240,4 +240,17 @@ final class TemplatesTest extends TestCase
 
         return $rules;
     }
+
+    /**
+     * At the end of the page nothing scrolls out from under the toolbar any
+     * more: a control of the page itself there (glitchr's footer cookie circle,
+     * on a phone) was under it, and a tap on it opened the profiler.
+     */
+    public function testAtTheEndOfThePageTheToolbarCoversNoControlOfThePage(): void
+    {
+        $js = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.js.twig');
+
+        self::assertStringContainsString('function atPageEnd()', $js);
+        self::assertMatchesRegularExpression('~if \(atPageEnd\(\)\) \{\s+var own = document\.querySelectorAll\(CONTROLS\);~', $js);
+    }
 }
