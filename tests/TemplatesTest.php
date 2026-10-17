@@ -210,7 +210,7 @@ final class TemplatesTest extends TestCase
         }
         self::assertStringContainsString('[tabindex]:not([tabindex="-1"])', $js, 'A panel focusable as a whole is not a control.');
         self::assertStringContainsString('(rect.width >= width * PAGE && rect.height >= height * PAGE)', $js, 'A page laid out in a fixed layer is not a panel.');
-        self::assertStringContainsString('if (found[i].bottom - found[i].top < window.innerHeight * TALL) {', $js, 'A side rail is kept clear of by its controls, not sent over the top.');
+        self::assertStringContainsString('if (list[i].bottom - list[i].top < window.innerHeight * TALL) {', $js, 'A side rail is kept clear of by its controls, not sent over the top.');
 
         /* Shown clear of the panels, kept where it was asked. */
         self::assertStringContainsString("var shown = moving ? clamped : clampPosition(nx, ny, true);\n        bar.style.transform = 'translate(' + shown.x + 'px, ' + shown.y + 'px)';\n        applied = shown;\n\n        return clamped;", $js);
@@ -252,5 +252,11 @@ final class TemplatesTest extends TestCase
 
         self::assertStringContainsString('function atPageEnd()', $js);
         self::assertMatchesRegularExpression('~if \(atPageEnd\(\)\) \{\s+var own = document\.querySelectorAll\(CONTROLS\);~', $js);
+        // A control measured with what it holds (latoucheoriginale's footer icons spill out of their links' line).
+        self::assertStringContainsString('var rect = drawnRect(own[k]);', $js);
+        // A short climb only (glitchr's intro: the toolbar rose to the top of the window to clear a column of links).
+        self::assertSame(1, preg_match('~var CLIMB = (\d+);~', $js, $climb));
+        self::assertLessThanOrEqual(200, (int) $climb[1]);
+        self::assertStringContainsString('if (ny - y > CLIMB) {', $js);
     }
 }
