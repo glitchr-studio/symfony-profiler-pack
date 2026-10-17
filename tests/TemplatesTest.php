@@ -261,9 +261,12 @@ final class TemplatesTest extends TestCase
         // Past it, within CLIMB, the page's last line is left clear first (a footer's credits: wineseller's lay under it), then as few controls as can be.
         self::assertStringContainsString('y = fewestCovered(own, panelsOnly, panelsOnly.length ? solve(panelsOnly) : ny);', $js);
         self::assertStringContainsString('var low = Math.max(minY, y - CLIMB);', $js);
-        self::assertStringContainsString('lastLine < best.lastLine || (lastLine === best.lastLine && (consent < best.consent || (consent === best.consent && (count < best.count', $js);
-        // A control fixed or stuck in the window (youtube's bottom navigation) is no part of the page's end; a cookie opener is covered last (genealogist's circle opened the profiler).
-        self::assertStringContainsString('if (bar.contains(own[k]) || pinned(own[k])) {', $js);
+        // Cookie openers first (genealogist's circle opened the profiler), then the last line, then the count.
+        self::assertStringContainsString('consent < best.consent || (consent === best.consent && (lastLine < best.lastLine || (lastLine === best.lastLine && (count < best.count', $js);
+        // A control fixed or stuck in the window is kept clear of (latoucheoriginale's bottom bar, nakaya's "back to top") but is no part of the last line (youtube's bottom navigation); one under another layer is out of reach (glitchr's footer under its intro).
+        self::assertStringContainsString("pinned: pinned(own[k]), consent: !!own[k].closest(CONSENT)", $js);
+        self::assertStringContainsString('lastLine = !own[r].pinned && own[r].bottom > last - LINE ? 1 : lastLine;', $js);
+        self::assertStringContainsString('if (rect && across(rect) && !hidden(own[k], rect)) {', $js);
         self::assertStringContainsString("var CONSENT = '[data-consent-open], [data-cookie-open], [data-consent], [data-cookie]';", $js);
     }
 }
