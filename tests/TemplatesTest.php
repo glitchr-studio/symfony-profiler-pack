@@ -264,6 +264,8 @@ final class TemplatesTest extends TestCase
         // Cookie openers first (genealogist's circle opened the profiler), then the last line, then the count.
         // A fixed control is covered after an ordinary link (nakaya-gourmet's "Haut de page").
         self::assertStringContainsString('var rank = [consent, lastLine, fixed, count, -ty];', $js);
+        // A dialog over the whole page (lesringostars' intro) is no page laid out: its controls are kept clear of (the toolbar lay on its enter button).
+        self::assertMatchesRegularExpression('~if \(el\.matches && el\.matches\(PANELS\)\) \{\s+var own = el\.querySelectorAll\(CONTROLS\);~', $js);
         // A control fixed or stuck in the window is kept clear of (latoucheoriginale's bottom bar, nakaya's "back to top") but is no part of the last line (youtube's bottom navigation); one under another layer is out of reach (glitchr's footer under its intro).
         self::assertStringContainsString("pinned: pinned(own[k]), consent: !!own[k].closest(CONSENT)", $js);
         self::assertStringContainsString('lastLine = !own[r].pinned && own[r].bottom > last - LINE ? 1 : lastLine;', $js);
