@@ -28,7 +28,9 @@
 
    At the end of the page, where nothing scrolls out from under it any more, it
    covers no control of the page itself either (a link of the footer, a cookie
-   circle there), kept clear of each the same way. #}
+   circle there, its icon included), kept clear of each the same way - for a
+   short climb only: rather than rise far up the window, it stays and covers
+   them. #}
 (function () {
     'use strict';
 
@@ -59,7 +61,8 @@
     var PANELS = 'dialog[open], [role="dialog"], [role="alertdialog"], [aria-modal="true"], [data-consent-banner], [data-cookie-banner], [data-toolbar-avoid]';
     var GRID = 32;          /* px between the points a panel is looked for under */
     var PAGE = 0.9;         /* a fixed layer this much of the window each way is the page laid out in it, not a panel */
-    var TALL = 0.75;        /* a panel this much of the window high (a side rail, a drawer) is kept clear of by its controls only */
+    var TALL = 0.75;
+    var CLIMB = 160;        /* px: the most the toolbar climbs to clear the page's own controls at its end; past that it stays and covers them */        /* a panel this much of the window high (a side rail, a drawer) is kept clear of by its controls only */
 
     var bar = null;
     var content = null;
@@ -191,6 +194,30 @@
         return rect;
     }
 
+    /* What a control shows: its own box and what it holds, an icon spilling out of a link's line included (a footer's icons). */
+    function drawnRect(el) {
+        var rect = visibleRect(el);
+        if (!rect) {
+            return null;
+        }
+        var top = rect.top;
+        var bottom = rect.bottom;
+        var left = rect.left;
+        var right = rect.right;
+        var inside = el.querySelectorAll('*');
+        for (var i = 0; i < inside.length && i < 12; i++) {
+            var child = visibleRect(inside[i]);
+            if (child) {
+                top = Math.min(top, child.top);
+                bottom = Math.max(bottom, child.bottom);
+                left = Math.min(left, child.left);
+                right = Math.max(right, child.right);
+            }
+        }
+
+        return { top: top, bottom: bottom, left: left, right: right, width: right - left, height: bottom - top };
+    }
+
     /* The panels of the page across the toolbar's column, from left to right: each one's top and bottom, and its controls'. */
     function panels(left, right) {
         var found = [];
@@ -256,9 +283,9 @@
                 if (bar.contains(own[k])) {
                     continue;
                 }
-                var rect = visibleRect(own[k]);
+                var rect = drawnRect(own[k]);
                 if (rect && across(rect)) {
-                    list.push({ top: rect.top, bottom: rect.bottom, controls: [{ top: rect.top, bottom: rect.bottom }] });
+                    list.push({ top: rect.top, bottom: rect.bottom, controls: [{ top: rect.top, bottom: rect.bottom }], page: true });
                 }
             }
         }
@@ -308,22 +335,41 @@
         if (!found.length) {
             return ny;
         }
-        var whole = [];
-        var controls = [];
-        for (var i = 0; i < found.length; i++) {
-            if (found[i].bottom - found[i].top < window.innerHeight * TALL) {
-                whole.push(found[i]);
-            } else {
-                whole = whole.concat(found[i].controls);
+
+        function solve(list) {
+            var whole = [];
+            var controls = [];
+            for (var i = 0; i < list.length; i++) {
+                if (list[i].bottom - list[i].top < window.innerHeight * TALL) {
+                    whole.push(list[i]);
+                } else {
+                    whole = whole.concat(list[i].controls);
+                }
+                controls = controls.concat(list[i].controls);
             }
-            controls = controls.concat(found[i].controls);
-        }
-        var y = nearestClear(whole, box.top, box.bottom, ny, minY, maxY);
-        if (null === y) {
-            y = nearestClear(controls, box.top, box.bottom, ny, minY, maxY);
+            var y = nearestClear(whole, box.top, box.bottom, ny, minY, maxY);
+            if (null === y) {
+                y = nearestClear(controls, box.top, box.bottom, ny, minY, maxY);
+            }
+
+            return null === y ? ny : y;
         }
 
-        return null === y ? ny : y;
+        /* The page's own controls (at its end) are worth a short climb only: past CLIMB the toolbar stays and covers them, kept clear of the panels alone. */
+        var y = solve(found);
+        if (ny - y > CLIMB) {
+            var panelsOnly = [];
+            for (var p = 0; p < found.length; p++) {
+                if (!found[p].page) {
+                    panelsOnly.push(found[p]);
+                }
+            }
+            if (panelsOnly.length < found.length) {
+                y = panelsOnly.length ? solve(panelsOnly) : ny;
+            }
+        }
+
+        return y;
     }
 
     function clampPosition(nx, ny, clear) {
