@@ -18,6 +18,8 @@
         <li><a href="{{ path('failing') }}">A page that fails</a></li>
         <li><a href="{{ path('page', {_locale: 'en', slug: 'bottom-nav'}) }}">A page with a navigation fixed along the bottom of the window</a></li>
         <li><a href="{{ path('page', {_locale: 'en', slug: 'cookie-panel'}) }}">A page with a cookie question floating at the bottom, over a navigation fixed along it</a></li>
+        <li><a href="{{ path('page', {_locale: 'en', slug: 'fixed-menu'}) }}">A long page with a "Menu" button fixed in the bottom right corner</a></li>
+        <li><a href="{{ path('page', {_locale: 'en', slug: 'countdown'}) }}">A page under an introduction over the whole window, its cookie question counting down</a></li>
     </ul>
     <p><button type="button" class="btn btn--neutral" id="ajax">Send an AJAX request</button> <output id="answer"></output></p>
     <script>
@@ -51,6 +53,42 @@
         document.querySelectorAll('[data-answer]').forEach(function (button) {
             button.addEventListener('click', function () { document.getElementById('cookie-panel').hidden = true; });
         });
+    </script>
+    {% endif %}
+    {% if 'fixed-menu' == slug %}
+    {# chapaland's /login on a phone: a round "Menu" button fixed in the bottom right corner, the layer itself the control. At rest, the page not at its end, the toolbar's handle lay on it; it is kept clear of wherever the page is. #}
+    <div style="height: 200vh;"><p>A long page: the top of it is not its end.</p></div>
+    <button type="button" id="fixed-menu" aria-label="Menu" style="position: fixed; right: 22px; bottom: 0; z-index: 10; width: 46px; height: 46px; border-radius: 50%;">&#9776;</button>
+    {% endif %}
+    {% if 'countdown' == slug %}
+    {# glitchr's home on a computer: an introduction laid over the whole window (a page laid out in a fixed layer, no dialog) hides the footer, whose links lie where the toolbar rests; low in the introduction, the enter button and the cookie circle, just above that place; higher, the cookie question, its countdown changing every second. The toolbar, over a hidden footer link, took it for in reach and climbed onto the enter button and the circle, found the link hidden again and fell back: on every tick. It stays at its place, clear of both. #}
+    <footer style="position: absolute; left: 0; right: 0; bottom: 0; height: 64px; display: flex; gap: 2rem; justify-content: center; align-items: center;">
+        <a href="#">Legal notice</a> <a href="#">Terms</a> <a href="#">Privacy</a> <a href="#">Open source</a> <a href="#" data-consent-open>Cookies</a>
+    </footer>
+    <section id="intro" aria-label="Introduction" style="position: fixed; inset: 0; z-index: 1000; background: #111; color: #eee;">
+        <p style="position: absolute; left: 0; right: 0; bottom: 4.5rem; display: flex; gap: .5rem; justify-content: center; margin: 0;">
+            <button type="button" id="enter" style="height: 45px;">Enter the agency</button>
+            <span data-consent><button type="button" aria-label="Cookies" style="width: 48px; height: 48px; border-radius: 50%;">&#9673;</button></span>
+        </p>
+        <div id="cookie-question" role="dialog" aria-label="Cookies" style="position: fixed; left: 50%; bottom: 8rem; width: 20rem; margin-left: -10rem; padding: 1rem; box-sizing: border-box; background: #fff; color: #111; border-radius: 14px;">
+            <p style="margin: 0 0 .6rem;">Refused in <span id="countdown">30</span> s.</p>
+            <p style="display: flex; gap: .5rem; margin: 0;"><button type="button" data-answer>Accept</button> <button type="button" data-answer>Refuse</button></p>
+        </div>
+    </section>
+    <script>
+        (function () {
+            var left = 30;
+            var timer = window.setInterval(function () {
+                left = Math.max(0, left - 1);
+                document.getElementById('countdown').textContent = String(left);
+            }, 1000);
+            document.querySelectorAll('[data-answer]').forEach(function (button) {
+                button.addEventListener('click', function () {
+                    window.clearInterval(timer);
+                    document.getElementById('cookie-question').hidden = true;
+                });
+            });
+        })();
     </script>
     {% endif %}
     <!-- end of the page -->

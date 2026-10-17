@@ -251,7 +251,7 @@ final class TemplatesTest extends TestCase
         $js = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.js.twig');
 
         self::assertStringContainsString('function atPageEnd()', $js);
-        self::assertMatchesRegularExpression('~if \(atPageEnd\(\)\) \{\s+var own = document\.querySelectorAll\(CONTROLS\);~', $js);
+        self::assertStringContainsString("var end = atPageEnd();\n        var own = document.querySelectorAll(CONTROLS);", $js);
         // A control measured with what it holds (latoucheoriginale's footer icons spill out of their links' line).
         self::assertStringContainsString('var rect = drawnRect(own[k]);', $js);
         // A short climb only (glitchr's intro: the toolbar rose to the top of the window to clear a column of links).
@@ -267,9 +267,41 @@ final class TemplatesTest extends TestCase
         // A dialog over the whole page (lesringostars' intro) is no page laid out: its controls are kept clear of (the toolbar lay on its enter button).
         self::assertMatchesRegularExpression('~if \(el\.matches && el\.matches\(PANELS\)\) \{\s+var own = el\.querySelectorAll\(CONTROLS\);~', $js);
         // A control fixed or stuck in the window is kept clear of (latoucheoriginale's bottom bar, nakaya's "back to top") but is no part of the last line (youtube's bottom navigation); one under another layer is out of reach (glitchr's footer under its intro).
-        self::assertStringContainsString("pinned: pinned(own[k]), consent: !!own[k].closest(CONSENT)", $js);
+        self::assertStringContainsString("pinned: !!layer, consent: !!own[k].closest(CONSENT)", $js);
         self::assertStringContainsString('lastLine = !own[r].pinned && own[r].bottom > last - LINE ? 1 : lastLine;', $js);
-        self::assertStringContainsString('if (rect && across(rect) && !hidden(own[k], rect)) {', $js);
+        self::assertStringContainsString('if (kept && !hidden(own[k], rect)) {', $js);
         self::assertStringContainsString("var CONSENT = '[data-consent-open], [data-cookie-open], [data-consent], [data-cookie]';", $js);
+    }
+
+    /**
+     * A control fixed in the window is kept clear of wherever the page is, not
+     * only at its end: nothing scrolls it out from under the toolbar
+     * (chapaland's "Menu" button, the layer itself the control, between the
+     * points a panel is looked for under). A layer as high as the window is
+     * the page laid out in it (lesringostars' main column), not such a control.
+     */
+    public function testAtRestTheToolbarKeepsClearOfAControlFixedInTheWindow(): void
+    {
+        $js = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.js.twig');
+
+        self::assertStringContainsString('var kept = end || (!!layer && layer.getBoundingClientRect().height < height * TALL);', $js);
+        self::assertStringContainsString("if ('fixed' === position || 'sticky' === position) {\n                return node;", $js, 'The layer, measured.');
+        self::assertStringNotContainsString('if (atPageEnd()) {', $js, 'The page\'s controls are looked at before its end too, the fixed ones kept.');
+    }
+
+    /**
+     * Whether a control is under another layer is told under the toolbar, not
+     * on top of it: lying over a control hidden by glitchr's intro, the
+     * toolbar took it for in reach, climbed off it onto the enter button and
+     * the cookie circle, found it hidden again and fell back, on each tick of
+     * the cookie question's countdown.
+     */
+    public function testWhatLiesUnderTheToolbarIsToldWithoutIt(): void
+    {
+        $js = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.js.twig');
+
+        self::assertSame(1, preg_match('~function hidden\(el, rect\) \{(.*?)\n    \}~s', $js, $hidden));
+        self::assertStringNotContainsString('elementFromPoint(', $hidden[1], 'The topmost element at a point may be the toolbar itself.');
+        self::assertStringContainsString('hit = bar.contains(stack[i]) ? null : stack[i];', $hidden[1], 'The first element under it that is not the toolbar\'s.');
     }
 }

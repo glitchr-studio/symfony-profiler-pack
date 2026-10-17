@@ -188,6 +188,36 @@ final class ToolbarTest extends PackTestCase
         self::assertStringContainsString('function clearOfPanels(', self::toolbarOf($client));
     }
 
+    /** chapaland's /login on a phone: a "Menu" button fixed in the bottom right corner of a long page, which the toolbar keeps clear of before the page's end. */
+    public function testTheFixedMenuPageShowsAFixedControlOnALongPage(): void
+    {
+        $client = self::client();
+        $crawler = $client->request('GET', '/en/page/fixed-menu');
+
+        $menu = $crawler->filter('button#fixed-menu[aria-label="Menu"]');
+        self::assertCount(1, $menu);
+        self::assertStringContainsString('position: fixed', (string) $menu->attr('style'));
+        self::assertStringContainsString('bottom: 0', (string) $menu->attr('style'));
+        self::assertCount(1, $crawler->filter('div[style*="height: 200vh"]'), 'Long enough: the top of the page is not its end.');
+    }
+
+    /** glitchr's home on a computer: an introduction over the whole window hiding the footer's links, its enter button and cookie circle just above the toolbar, a cookie question counting down every second. */
+    public function testTheCountdownPageShowsAnIntroductionOverTheFooter(): void
+    {
+        $client = self::client();
+        $crawler = $client->request('GET', '/en/page/countdown');
+
+        $intro = $crawler->filter('section#intro');
+        self::assertCount(1, $intro);
+        self::assertStringContainsString('position: fixed; inset: 0', (string) $intro->attr('style'));
+        self::assertNull($intro->attr('role'), 'A page laid out in a fixed layer, not a dialog.');
+        self::assertCount(1, $intro->filter('button#enter'));
+        self::assertCount(1, $intro->filter('[data-consent] button'));
+        self::assertCount(5, $crawler->filter('footer a'));
+        self::assertCount(1, $crawler->filter('#cookie-question[role="dialog"] #countdown'));
+        self::assertStringContainsString("window.setInterval(function () {", (string) $client->getResponse()->getContent());
+    }
+
     public function testThePhoneLayoutIsPartOfTheFloatingToolbar(): void
     {
         $client = self::client();

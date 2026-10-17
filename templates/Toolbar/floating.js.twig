@@ -30,7 +30,10 @@
    covers no control of the page itself either (a link of the footer, a cookie
    circle there, its icon included), kept clear of each the same way - for a
    short climb only: rather than rise far up the window, it stays and covers
-   them. #}
+   them. A control fixed or stuck in the window (a "Menu" button, "back to
+   top") is kept clear of so wherever the page is, nothing scrolling it away.
+   A control under another layer is out of reach, the toolbar looked through:
+   where it lies is no reason to move. #}
 (function () {
     'use strict';
 
@@ -291,44 +294,55 @@
             }
         }
 
-        /* At the end of the page nothing scrolls out from under the toolbar any more: a control of the page itself (a link of the footer, its cookie circle) is kept clear of too, each one a panel of its own. Before the end, the page's controls pass under it as it scrolls, and it stays where it is. */
-        if (atPageEnd()) {
-            var own = document.querySelectorAll(CONTROLS);
-            for (var k = 0; k < own.length; k++) {
-                if (bar.contains(own[k])) {
-                    continue;
-                }
-                var rect = drawnRect(own[k]);
-                /* Under another layer (glitchr's intro over its footer) a control is out of reach: nothing to keep clear of. */
-                if (rect && across(rect) && !hidden(own[k], rect)) {
-                    /* A control of a layer fixed or stuck in the window (a bottom bar, "back to top") is kept clear of, but is no part of the page's last line. */
-                    list.push({ top: rect.top, bottom: rect.bottom, controls: [{ top: rect.top, bottom: rect.bottom }], page: true, pinned: pinned(own[k]), consent: !!own[k].closest(CONSENT) });
-                }
+        /* At the end of the page nothing scrolls out from under the toolbar any more: a control of the page itself (a link of the footer, its cookie circle) is kept clear of too, each one a panel of its own. Before the end, the page's controls pass under it as it scrolls, and it stays where it is - but for a control fixed or stuck in the window (chapaland's "Menu" button, "back to top"), which nothing scrolls away: it is kept clear of wherever the page is, ranked the same way. */
+        var end = atPageEnd();
+        var own = document.querySelectorAll(CONTROLS);
+        for (var k = 0; k < own.length; k++) {
+            var near = own[k].getBoundingClientRect();
+            /* A control a window away from it is no matter, and is not measured (a long page holds thousands). */
+            if (near.bottom < -height || near.top > 2 * height || bar.contains(own[k])) {
+                continue;
+            }
+            var rect = drawnRect(own[k]);
+            if (!rect || !across(rect)) {
+                continue;
+            }
+            var layer = pinned(own[k]);
+            /* Before the end, a layer as high as the window (lesringostars' page scrolls inside a fixed main column, beside a fixed rail) is the page, not a control kept in place: its controls pass under the toolbar as they scroll. */
+            var kept = end || (!!layer && layer.getBoundingClientRect().height < height * TALL);
+            /* Under another layer (glitchr's intro over its footer) a control is out of reach: nothing to keep clear of. */
+            if (kept && !hidden(own[k], rect)) {
+                /* A control of a layer fixed or stuck in the window (a bottom bar, "back to top") is kept clear of, but is no part of the page's last line. */
+                list.push({ top: rect.top, bottom: rect.bottom, controls: [{ top: rect.top, bottom: rect.bottom }], page: true, pinned: !!layer, consent: !!own[k].closest(CONSENT) });
             }
         }
 
         return list;
     }
 
-    /* Another layer lies over the middle of the control (the toolbar itself does not count). */
+    /* Another layer lies over the middle of the control. The toolbar itself does not count, and is looked through rather than taken for what is on top: where it lay over a control hidden under another layer (glitchr's footer under its intro), that control counted as in reach, the toolbar climbed off it, the control was hidden again and the toolbar fell back - on every change of the page (the cookie question's countdown, each second). */
     function hidden(el, rect) {
         var x = Math.min(Math.max((rect.left + rect.right) / 2, 0), window.innerWidth - 1);
         var y = Math.min(Math.max((rect.top + rect.bottom) / 2, 0), window.innerHeight - 1);
-        var hit = document.elementFromPoint ? document.elementFromPoint(x, y) : null;
+        var stack = document.elementsFromPoint ? document.elementsFromPoint(x, y) : [];
+        var hit = null;
+        for (var i = 0; i < stack.length && !hit; i++) {
+            hit = bar.contains(stack[i]) ? null : stack[i];
+        }
 
-        return !!hit && hit !== el && !el.contains(hit) && !hit.contains(el) && !bar.contains(hit);
+        return !!hit && hit !== el && !el.contains(hit) && !hit.contains(el);
     }
 
-    /* Inside a layer fixed or stuck in the window. */
+    /* The layer fixed or stuck in the window the element is inside, the nearest one; null when there is none. */
     function pinned(el) {
         for (var node = el; node && node !== document.body && node !== document.documentElement; node = node.parentElement) {
             var position = window.getComputedStyle(node).position;
             if ('fixed' === position || 'sticky' === position) {
-                return true;
+                return node;
             }
         }
 
-        return false;
+        return null;
     }
 
     /* The page shows its end: scrolled to the bottom, or no taller than the window. */
@@ -393,7 +407,7 @@
             return null === y ? ny : y;
         }
 
-        /* The page's own controls (at its end) are worth a short climb only: past CLIMB it climbs no more than CLIMB, to a height covering no cookie opener, leaving the page's last line clear (a footer's credits) and covering as few of them as it can, kept clear of the panels. */
+        /* The page's own controls (at its end, or fixed in the window) are worth a short climb only: past CLIMB it climbs no more than CLIMB, to a height covering no cookie opener, leaving the page's last line clear (a footer's credits) and covering as few of them as it can, kept clear of the panels. */
         var y = solve(found);
         if (ny - y > CLIMB) {
             var panelsOnly = [];

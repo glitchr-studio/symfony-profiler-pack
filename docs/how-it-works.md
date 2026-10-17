@@ -80,6 +80,25 @@ is shown or hidden (`hidden`, `class`, `open`, `aria-hidden`, `aria-expanded`), 
 end of a transition or an animation). A bar or a panel that goes takes the toolbar back down with it:
 the place asked for was kept.
 
+## Clear of the page's own controls
+
+At the end of the page, where nothing scrolls out from under the toolbar any more, it keeps clear of
+the page's own controls too (a footer's links, its cookie circle), for a short climb only (160px):
+past it, it climbs no more than that, to the height covering the fewest cookie openers, then leaving
+the page's last line clear (a footer's credits), then covering the fewest controls fixed in the
+window, then the fewest controls, then the nearest.
+
+Before the end, the page's controls pass under the toolbar as it scrolls and it stays where it is,
+but for a control fixed or stuck in the window (a "Menu" button in a corner, "back to top"), which
+nothing scrolls away: it is kept clear of wherever the page is, ranked the same way. A layer as high
+as the window (75%) is the page laid out in it, a column scrolling inside a fixed layer, not such a
+control.
+
+A control another layer lies over (a footer under an introduction over the whole page) is out of
+reach and nothing to keep clear of. What lies over it is looked for under the toolbar, the toolbar
+looked through: where the toolbar is never decides where it goes, so it does not move while nothing
+it keeps clear of moves.
+
 ## On a narrow window or under a finger
 
 Below 768px wide, or wherever the pointer is coarse, the floating toolbar is one piece. The handle,
