@@ -282,18 +282,28 @@
         if (atPageEnd()) {
             var own = document.querySelectorAll(CONTROLS);
             for (var k = 0; k < own.length; k++) {
-                /* A control of a layer fixed or stuck in the window (a bottom navigation) is no part of the page's end: the toolbar already rests above such a bar. */
-                if (bar.contains(own[k]) || pinned(own[k])) {
+                if (bar.contains(own[k])) {
                     continue;
                 }
                 var rect = drawnRect(own[k]);
-                if (rect && across(rect)) {
-                    list.push({ top: rect.top, bottom: rect.bottom, controls: [{ top: rect.top, bottom: rect.bottom }], page: true, consent: !!own[k].closest(CONSENT) });
+                /* Under another layer (glitchr's intro over its footer) a control is out of reach: nothing to keep clear of. */
+                if (rect && across(rect) && !hidden(own[k], rect)) {
+                    /* A control of a layer fixed or stuck in the window (a bottom bar, "back to top") is kept clear of, but is no part of the page's last line. */
+                    list.push({ top: rect.top, bottom: rect.bottom, controls: [{ top: rect.top, bottom: rect.bottom }], page: true, pinned: pinned(own[k]), consent: !!own[k].closest(CONSENT) });
                 }
             }
         }
 
         return list;
+    }
+
+    /* Another layer lies over the middle of the control (the toolbar itself does not count). */
+    function hidden(el, rect) {
+        var x = Math.min(Math.max((rect.left + rect.right) / 2, 0), window.innerWidth - 1);
+        var y = Math.min(Math.max((rect.top + rect.bottom) / 2, 0), window.innerHeight - 1);
+        var hit = document.elementFromPoint ? document.elementFromPoint(x, y) : null;
+
+        return !!hit && hit !== el && !el.contains(hit) && !hit.contains(el) && !bar.contains(hit);
     }
 
     /* Inside a layer fixed or stuck in the window. */
@@ -370,7 +380,7 @@
             return null === y ? ny : y;
         }
 
-        /* The page's own controls (at its end) are worth a short climb only: past CLIMB it climbs no more than CLIMB, to a height leaving the page's last line clear (a footer's credits) and covering as few of them as it can, kept clear of the panels. */
+        /* The page's own controls (at its end) are worth a short climb only: past CLIMB it climbs no more than CLIMB, to a height covering no cookie opener, leaving the page's last line clear (a footer's credits) and covering as few of them as it can, kept clear of the panels. */
         var y = solve(found);
         if (ny - y > CLIMB) {
             var panelsOnly = [];
@@ -385,7 +395,7 @@
 
         return y;
 
-        /* Within CLIMB of y, the height leaving the page's last line clear (a footer's credits), then its cookie openers, then covering the fewest of its controls, then the nearer. */
+        /* Within CLIMB of y, the height covering the fewest cookie openers (a tap there must open the panel, not the profiler), then leaving the page's last line clear (a footer's credits), then covering the fewest controls, then the nearer. */
         function fewestCovered(own, panelsOnly, y) {
             var low = Math.max(minY, y - CLIMB);
             var keep = [];
@@ -394,7 +404,9 @@
             }
             var last = -Infinity;
             for (var l = 0; l < own.length; l++) {
-                last = Math.max(last, own[l].bottom);
+                if (!own[l].pinned) {
+                    last = Math.max(last, own[l].bottom);
+                }
             }
             var tries = [y];
             for (var i = 0; i < own.length; i++) {
@@ -412,11 +424,11 @@
                 for (var r = 0; r < own.length; r++) {
                     if (box.top + ty < own[r].bottom && box.bottom + ty > own[r].top) {
                         count++;
-                        lastLine = own[r].bottom > last - LINE ? 1 : lastLine;
-                        consent = own[r].consent ? 1 : consent;
+                        lastLine = !own[r].pinned && own[r].bottom > last - LINE ? 1 : lastLine;
+                        consent += own[r].consent ? 1 : 0;
                     }
                 }
-                if (null === best || lastLine < best.lastLine || (lastLine === best.lastLine && (consent < best.consent || (consent === best.consent && (count < best.count || (count === best.count && ty > best.y)))))) {
+                if (null === best || consent < best.consent || (consent === best.consent && (lastLine < best.lastLine || (lastLine === best.lastLine && (count < best.count || (count === best.count && ty > best.y)))))) {
                     best = { y: ty, count: count, lastLine: lastLine, consent: consent };
                 }
             }
