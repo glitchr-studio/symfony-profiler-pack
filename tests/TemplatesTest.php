@@ -258,5 +258,9 @@ final class TemplatesTest extends TestCase
         self::assertSame(1, preg_match('~var CLIMB = (\d+);~', $js, $climb));
         self::assertLessThanOrEqual(200, (int) $climb[1]);
         self::assertStringContainsString('if (ny - y > CLIMB) {', $js);
+        // Past it, within CLIMB, the page's last line is left clear first (a footer's credits: wineseller's lay under it), then as few controls as can be.
+        self::assertStringContainsString('y = fewestCovered(own, panelsOnly, panelsOnly.length ? solve(panelsOnly) : ny);', $js);
+        self::assertStringContainsString('var low = Math.max(minY, y - CLIMB);', $js);
+        self::assertStringContainsString('lastLine < best.lastLine || (lastLine === best.lastLine && (count < best.count', $js);
     }
 }
