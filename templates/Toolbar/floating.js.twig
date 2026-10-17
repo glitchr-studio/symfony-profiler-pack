@@ -238,7 +238,20 @@
             }
             found.push(el);
             var rect = visibleRect(el);
-            if (!rect || !across(rect) || (rect.width >= width * PAGE && rect.height >= height * PAGE)) {
+            if (!rect || !across(rect)) {
+                return;
+            }
+            if (rect.width >= width * PAGE && rect.height >= height * PAGE) {
+                /* The page laid out in a fixed layer is no panel; a dialog over the whole page (an intro, a modal) is the page's only way on: each of its controls is kept clear of. */
+                if (el.matches && el.matches(PANELS)) {
+                    var own = el.querySelectorAll(CONTROLS);
+                    for (var o = 0; o < own.length; o++) {
+                        var mark = visibleRect(own[o]);
+                        if (mark && across(mark)) {
+                            list.push({ top: mark.top, bottom: mark.bottom, controls: [{ top: mark.top, bottom: mark.bottom }] });
+                        }
+                    }
+                }
                 return;
             }
             var controls = [];
