@@ -59,6 +59,7 @@
 
     var CONTROLS = 'a[href], button, input, select, textarea, summary, [role="button"], [role="link"], [role="checkbox"], [role="switch"], [contenteditable="true"], [tabindex]:not([tabindex="-1"])';
     var PANELS = 'dialog[open], [role="dialog"], [role="alertdialog"], [aria-modal="true"], [data-consent-banner], [data-cookie-banner], [data-toolbar-avoid]';
+    var CONSENT = '[data-consent-open], [data-cookie-open], [data-consent], [data-cookie]';   /* what opens the cookie panel: a tap on it must never reach the toolbar */
     var GRID = 32;          /* px between the points a panel is looked for under */
     var PAGE = 0.9;         /* a fixed layer this much of the window each way is the page laid out in it, not a panel */
     var TALL = 0.75;        /* a panel this much of the window high (a side rail, a drawer) is kept clear of by its controls only */
@@ -281,17 +282,30 @@
         if (atPageEnd()) {
             var own = document.querySelectorAll(CONTROLS);
             for (var k = 0; k < own.length; k++) {
-                if (bar.contains(own[k])) {
+                /* A control of a layer fixed or stuck in the window (a bottom navigation) is no part of the page's end: the toolbar already rests above such a bar. */
+                if (bar.contains(own[k]) || pinned(own[k])) {
                     continue;
                 }
                 var rect = drawnRect(own[k]);
                 if (rect && across(rect)) {
-                    list.push({ top: rect.top, bottom: rect.bottom, controls: [{ top: rect.top, bottom: rect.bottom }], page: true });
+                    list.push({ top: rect.top, bottom: rect.bottom, controls: [{ top: rect.top, bottom: rect.bottom }], page: true, consent: !!own[k].closest(CONSENT) });
                 }
             }
         }
 
         return list;
+    }
+
+    /* Inside a layer fixed or stuck in the window. */
+    function pinned(el) {
+        for (var node = el; node && node !== document.body && node !== document.documentElement; node = node.parentElement) {
+            var position = window.getComputedStyle(node).position;
+            if ('fixed' === position || 'sticky' === position) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /* The page shows its end: scrolled to the bottom, or no taller than the window. */
@@ -371,7 +385,7 @@
 
         return y;
 
-        /* Within CLIMB of y, the height leaving the page's last line clear (a footer's credits), then covering the fewest of its controls, then the nearer. */
+        /* Within CLIMB of y, the height leaving the page's last line clear (a footer's credits), then its cookie openers, then covering the fewest of its controls, then the nearer. */
         function fewestCovered(own, panelsOnly, y) {
             var low = Math.max(minY, y - CLIMB);
             var keep = [];
@@ -394,14 +408,16 @@
                 }
                 var count = 0;
                 var lastLine = 0;
+                var consent = 0;
                 for (var r = 0; r < own.length; r++) {
                     if (box.top + ty < own[r].bottom && box.bottom + ty > own[r].top) {
                         count++;
                         lastLine = own[r].bottom > last - LINE ? 1 : lastLine;
+                        consent = own[r].consent ? 1 : consent;
                     }
                 }
-                if (null === best || lastLine < best.lastLine || (lastLine === best.lastLine && (count < best.count || (count === best.count && ty > best.y)))) {
-                    best = { y: ty, count: count, lastLine: lastLine };
+                if (null === best || lastLine < best.lastLine || (lastLine === best.lastLine && (consent < best.consent || (consent === best.consent && (count < best.count || (count === best.count && ty > best.y)))))) {
+                    best = { y: ty, count: count, lastLine: lastLine, consent: consent };
                 }
             }
 

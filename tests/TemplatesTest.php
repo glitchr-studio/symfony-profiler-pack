@@ -261,6 +261,9 @@ final class TemplatesTest extends TestCase
         // Past it, within CLIMB, the page's last line is left clear first (a footer's credits: wineseller's lay under it), then as few controls as can be.
         self::assertStringContainsString('y = fewestCovered(own, panelsOnly, panelsOnly.length ? solve(panelsOnly) : ny);', $js);
         self::assertStringContainsString('var low = Math.max(minY, y - CLIMB);', $js);
-        self::assertStringContainsString('lastLine < best.lastLine || (lastLine === best.lastLine && (count < best.count', $js);
+        self::assertStringContainsString('lastLine < best.lastLine || (lastLine === best.lastLine && (consent < best.consent || (consent === best.consent && (count < best.count', $js);
+        // A control fixed or stuck in the window (youtube's bottom navigation) is no part of the page's end; a cookie opener is covered last (genealogist's circle opened the profiler).
+        self::assertStringContainsString('if (bar.contains(own[k]) || pinned(own[k])) {', $js);
+        self::assertStringContainsString("var CONSENT = '[data-consent-open], [data-cookie-open], [data-consent], [data-cookie]';", $js);
     }
 }
