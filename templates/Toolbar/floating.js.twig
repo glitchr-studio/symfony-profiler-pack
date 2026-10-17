@@ -395,7 +395,7 @@
 
         return y;
 
-        /* Within CLIMB of y, the height covering the fewest cookie openers (a tap there must open the panel, not the profiler), then leaving the page's last line clear (a footer's credits), then covering the fewest controls, then the nearer. */
+        /* Within CLIMB of y, the height covering the fewest cookie openers (a tap there must open the panel, not the profiler), then leaving the page's last line clear (a footer's credits), then covering the fewest fixed controls (the only way to an action while the page scrolls: "back to top"), then the fewest controls, then the nearer. */
         function fewestCovered(own, panelsOnly, y) {
             var low = Math.max(minY, y - CLIMB);
             var keep = [];
@@ -421,19 +421,33 @@
                 var count = 0;
                 var lastLine = 0;
                 var consent = 0;
+                var fixed = 0;
                 for (var r = 0; r < own.length; r++) {
                     if (box.top + ty < own[r].bottom && box.bottom + ty > own[r].top) {
                         count++;
                         lastLine = !own[r].pinned && own[r].bottom > last - LINE ? 1 : lastLine;
                         consent += own[r].consent ? 1 : 0;
+                        fixed += own[r].pinned ? 1 : 0;
                     }
                 }
-                if (null === best || consent < best.consent || (consent === best.consent && (lastLine < best.lastLine || (lastLine === best.lastLine && (count < best.count || (count === best.count && ty > best.y)))))) {
-                    best = { y: ty, count: count, lastLine: lastLine, consent: consent };
+                var rank = [consent, lastLine, fixed, count, -ty];
+                if (null === best || before(rank, best.rank)) {
+                    best = { y: ty, rank: rank };
                 }
             }
 
             return null === best ? y : best.y;
+
+            /* Whether one rank comes before another, its first differing term the smaller. */
+            function before(a, b) {
+                for (var i = 0; i < a.length; i++) {
+                    if (a[i] !== b[i]) {
+                        return a[i] < b[i];
+                    }
+                }
+
+                return false;
+            }
         }
     }
 
