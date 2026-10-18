@@ -78,7 +78,14 @@ The toolbar is put back inside on every change: a resized window, a scrolled pag
 closed or filled (once its transitions are over), a bar or a panel of the page that comes or goes,
 is shown or hidden (`hidden`, `class`, `open`, `aria-hidden`, `aria-expanded`), or has slid in (the
 end of a transition or an animation). A bar or a panel that goes takes the toolbar back down with it:
-the place asked for was kept.
+the place asked for was kept. While it is resized it stays where it is too, its edge under the
+pointer; let go, it is put back clear of the page's panels for its new width.
+
+What is done on the toolbar is not done on the page. Its pointer, mouse, touch and key events stop
+as they leave it, after the toolbar's own listeners and the pack's (which listen on the window as the
+events come down): a page whose splash ends at the first press anywhere, or whose panel closes on a
+click elsewhere, never hears a press, a drag or a click on the toolbar. A wheel is left to scroll the
+page.
 
 ## Clear of the page's own controls
 

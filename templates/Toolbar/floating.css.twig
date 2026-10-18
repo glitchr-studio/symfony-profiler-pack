@@ -76,6 +76,8 @@ div.sf-toolbar .sf-toolbar-block .sf-toolbar-info-piece a { padding:0 0.25em; }
     cursor: -webkit-grab;
 }
 .sf-toolbar-closed .sf-toolbarreset::before { display:none; }
+/* Over the left edge, its padding included, the cursor says it resizes (floating.js). */
+.sf-toolbarreset.profiler-pack-edge { cursor: ew-resize; }
 .sf-toolbarreset::before {
     content: '';
     width: 5px;

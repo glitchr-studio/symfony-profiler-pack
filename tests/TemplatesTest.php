@@ -78,12 +78,51 @@ final class TemplatesTest extends TestCase
             self::assertStringContainsString($used, $js);
         }
         foreach (['mousedown', 'mousemove', 'mouseup'] as $unused) {
-            self::assertStringNotContainsString("'".$unused."'", $js);
+            self::assertDoesNotMatchRegularExpression('~addEventListener\\(\''.$unused.'\'~', $js);
         }
 
         $css = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.css.twig');
         self::assertMatchesRegularExpression('~\.sf-toolbar-toggle-button\s*\{\s*touch-action:\s*none;~', $css);
         self::assertStringContainsString('@media (pointer: coarse)', $css);
+    }
+
+    /**
+     * What is done on the toolbar is not done on the page: its pointer, mouse,
+     * touch and key events stop as they leave it (a splash a press skips, a
+     * click elsewhere that closes a panel), the pack's own gestures listening
+     * on the window as they come down; a wheel still scrolls the page.
+     */
+    public function testTheToolbarsEventsDoNotReachThePage(): void
+    {
+        $js = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.js.twig');
+
+        self::assertSame(1, preg_match("~var SHIELDED = \\[(.*?)\\];~", $js, $shielded));
+        foreach (['pointerdown', 'pointerup', 'mousedown', 'click', 'dblclick', 'touchstart', 'keydown'] as $type) {
+            self::assertStringContainsString("'".$type."'", $shielded[1]);
+        }
+        self::assertStringNotContainsString("'wheel'", $shielded[1]);
+        self::assertStringContainsString('shield(bar);', $js);
+        self::assertStringContainsString('event.stopPropagation();', $js);
+
+        foreach (['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'dblclick'] as $type) {
+            self::assertDoesNotMatchRegularExpression("~document\\.addEventListener\\('".$type."'~", $js);
+            self::assertMatchesRegularExpression("~window\\.addEventListener\\('".$type."'~", $js);
+        }
+    }
+
+    /**
+     * Resized, the toolbar stays where it is under the pointer, as it does
+     * while it is moved: it is kept clear of the page's panels once let go.
+     */
+    public function testTheToolbarStaysPutWhileItIsResized(): void
+    {
+        $js = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.js.twig');
+
+        self::assertStringContainsString('if (!bar || drag || resize) {', $js);
+        self::assertMatchesRegularExpression('~write\(WIDTH_KEY, String\(Math\.round\(width\(\)\)\)\);\s*resize = null;\s*(/\*.*?\*/\s*)?settle\(\);~s', $js);
+
+        $css = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.css.twig');
+        self::assertMatchesRegularExpression('~\.sf-toolbarreset\.profiler-pack-edge\s*\{\s*cursor:\s*ew-resize;~', $css);
     }
 
     /**
