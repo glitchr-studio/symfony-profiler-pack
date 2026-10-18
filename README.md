@@ -25,10 +25,14 @@ which installs the profiler itself. This one adds to it.
 - **It remembers.** Place and width are kept by the browser, from one page to the next.
 - **It stays in the window.** Wherever it is dragged, kept or restored (a place kept on a wide screen,
   read on a phone), its handle and its right end stay in view, inside what the browser shows of the
-  page, and above a bar the page keeps fixed along the bottom of the window (a tab bar, a player).
+  page, and, in its corner, above a bar the page keeps fixed along the bottom of the window (a tab
+  bar, a player).
 - **It covers no button of the page's panels.** A cookie question floating at the bottom, a dialog, a
   chat button: the toolbar is shown just above it (or at the nearest height clear of it) while it is
   open, and goes back once it is closed. A page can mark anything else with `data-toolbar-avoid`.
+- **Where you put it, it stays.** Making way for the page is for the places the pack chooses, its
+  corner and aside. Dragged and let go, the toolbar stays exactly there, the window alone bounding
+  it: no header, bar, panel or footer of the page moves it. A double click hands it back.
 - **On a phone, one piece.** Below 768px, or under a finger, the handle is the right end of the pill
   rather than a box beside it; the pill spans the window, its blocks scroll sideways, and it keeps
   clear of the bottom a phone keeps for itself (`env(safe-area-inset-bottom)`). Closed, the handle

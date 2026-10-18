@@ -35,7 +35,12 @@
    them. A control fixed or stuck in the window (a "Menu" button, "back to
    top") is kept clear of so wherever the page is, nothing scrolling it away.
    A control under another layer is out of reach, the toolbar looked through:
-   where it lies is no reason to move. #}
+   where it lies is no reason to move.
+
+   All of that is for the places the pack chooses: its corner, and aside. A
+   place chosen by hand (a drag let go) is kept as it was put, the window alone
+   bounding it: no bar, panel, header or footer of the page moves it. A double
+   click or a double tap gives the pack its say again. #}
 (function () {
     'use strict';
 
@@ -80,6 +85,7 @@
     var y = 0;
     var drag = null;
     var resize = null;
+    var hand = false;       /* the place was chosen by hand (a drag): kept as it was put, the page's layout aside */
     var swallowClick = false;
     var openBeforeClicks = true;
     var lastDown = 0;
@@ -160,14 +166,15 @@
     }
 
     /* The lowest line the toolbar may reach: the bottom of what the browser shows, above the page's own bottom bar. */
-    function floor() {
+    /* The lowest the toolbar's bottom goes: what the browser shows, and, for a place the pack chose (page), above the page's bottom bar. */
+    function floor(page) {
         var bottom = window.innerHeight;
         var viewport = window.visualViewport;
         if (viewport && Math.abs(viewport.scale - 1) < 0.01) {
             bottom = Math.min(bottom, viewport.offsetTop + viewport.height);
         }
 
-        return Math.min(bottom, window.innerHeight - pageBottomBar()) - MARGIN;
+        return (page ? Math.min(bottom, window.innerHeight - pageBottomBar()) : bottom) - MARGIN;
     }
 
     /* The toolbar where it would be without any move: its pill and its handle, the transform taken off. */
@@ -480,7 +487,8 @@
         }
     }
 
-    function clampPosition(nx, ny, clear) {
+    /* Inside the window; and, page true, clear of the page's own bar along the bottom - with clear, of its panels and controls too. */
+    function clampPosition(nx, ny, clear, page) {
         var box = bounds();
         if (!box) {
             return { x: nx, y: ny };
@@ -488,7 +496,7 @@
         var minX = MARGIN - box.handleLeft;
         var maxX = Math.max(minX, window.innerWidth - MARGIN - box.right);
         var minY = MARGIN - box.top;
-        var maxY = Math.max(minY, floor() - box.bottom);
+        var maxY = Math.max(minY, floor(page) - box.bottom);
         var cx = Math.min(maxX, Math.max(minX, nx));
         var cy = Math.min(maxY, Math.max(minY, ny));
 
@@ -502,10 +510,12 @@
         return Math.min(Math.max(fullWidth, MIN_WIDTH), Math.max(FOLDED_WIDTH, width));
     }
 
-    /* Shown at (nx, ny), in the window; kept clear of the page's panels but while it is being moved. Returns the place in the window, the one to keep. */
+    /* Shown at (nx, ny), in the window. Where the pack put it (its corner, aside), it makes way for the page's layout: above its bottom bar, clear of its panels and controls. */
+    /* Where a hand put it, and while it is moved, nothing of the page moves it: the window alone bounds it. Returns the place in the window, the one to keep. */
     function place(nx, ny, moving) {
-        var clamped = clampPosition(nx, ny, false);
-        var shown = moving ? clamped : clampPosition(nx, ny, true);
+        var page = !moving && !hand;
+        var clamped = clampPosition(nx, ny, false, page);
+        var shown = page ? clampPosition(nx, ny, true, true) : clamped;
         bar.style.transform = 'translate(' + shown.x + 'px, ' + shown.y + 'px)';
         applied = shown;
 
@@ -550,6 +560,8 @@
         /* The place asked for is kept as it was asked; where it is shown may be nearer (a smaller window, a bar of the page). */
         x = DRAGGABLE && position ? Number(position.x) || 0 : 0;
         y = DRAGGABLE && position ? Number(position.y) || 0 : 0;
+        /* A place kept before the mark: by hand unless on the bottom line, where the corner and the place aside are. */
+        hand = DRAGGABLE && !!position && ('hand' in position ? true === position.hand : 0 !== y);
         place(x, y);
 
         invert();
@@ -680,10 +692,11 @@
     function release(event) {
         if (drag) {
             if (drag.moved) {
+                hand = true;
                 var placed = place(drag.fromX + event.clientX - drag.startX, drag.fromY + event.clientY - drag.startY);
                 x = placed.x;
                 y = placed.y;
-                write(POSITION_KEY, JSON.stringify({ x: x, y: y }));
+                write(POSITION_KEY, JSON.stringify({ x: x, y: y, hand: true }));
                 swallowClick = true;
                 invert();
                 lastTap = null;
@@ -741,10 +754,11 @@
         var box = bounds();
         var left = box ? MARGIN - box.handleLeft : -(window.innerWidth - 5 * PADDING);
         var aside = applied.x <= left + ASIDE;
+        hand = false;
         var placed = place(aside ? 0 : left, 0);
         x = placed.x;
         y = 0;
-        write(POSITION_KEY, JSON.stringify({ x: x, y: y }));
+        write(POSITION_KEY, JSON.stringify({ x: x, y: y, hand: false }));
 
         window.setTimeout(function () {
             if (toggle && openBeforeClicks === bar.classList.contains('sf-toolbar-closed')) {
