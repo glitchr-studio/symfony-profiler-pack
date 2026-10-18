@@ -1,6 +1,8 @@
 {# The floating toolbar's gestures. The handle is the toolbar's own button
    (.sf-toolbar-toggle-button): held and moved, it carries the toolbar; a plain
-   click still opens and closes it. The left edge resizes. Place and width are
+   click still opens and closes it. The left edge resizes, the toolbar staying
+   where it is meanwhile. What is done on it never reaches the page's own
+   listeners (shield). Place and width are
    kept in localStorage. Pointer events, so a finger and a pen do what the
    mouse does: the handle keeps the pointer while it moves (pointer capture)
    and is not a place to scroll the page from (touch-action, floating.css); a
@@ -518,7 +520,7 @@
         settling = true;
         window.requestAnimationFrame(function () {
             settling = false;
-            if (!bar || drag) {
+            if (!bar || drag || resize) {
                 return;
             }
             place(x, y);
@@ -565,6 +567,7 @@
 
         bar = currentBar;
         content = currentContent;
+        shield(bar);
         applied = { x: 0, y: 0 };
         bar.style.transform = '';
 
@@ -576,12 +579,30 @@
         restore();
     }
 
+    /* What a visitor does on the toolbar is not done on the page: the page's own listeners (a splash a press skips, a click elsewhere that closes a panel, a key that turns a slide) never hear it. Stopped as it leaves the toolbar, after the toolbar's own listeners and the pack's (on the window, capturing); a wheel is left to scroll the page. */
+    var SHIELDED = ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'mousedown', 'mousemove', 'mouseup', 'click', 'dblclick', 'auxclick', 'contextmenu', 'touchstart', 'touchmove', 'touchend', 'touchcancel', 'keydown', 'keyup', 'keypress'];
+
+    function shield(el) {
+        if (el.__profilerPackShield) {
+            return;
+        }
+        el.__profilerPackShield = true;
+        SHIELDED.forEach(function (type) {
+            el.addEventListener(type, function (event) {
+                event.stopPropagation();
+            });
+        });
+    }
+
+    /* The left edge: the toolbar's padding and its grip (::before), and never less than EDGE. */
     function onLeftEdge(event) {
         if (!isOpen()) {
             return false;
         }
         var rect = content.getBoundingClientRect();
-        var edge = 'touch' === event.pointerType ? TOUCH_EDGE : EDGE;
+        var style = window.getComputedStyle(content);
+        var grip = (parseFloat(style.borderLeftWidth) || 0) + (parseFloat(style.paddingLeft) || 0) + (parseFloat(window.getComputedStyle(content, '::before').width) || 0) + 2;
+        var edge = Math.max(grip, 'touch' === event.pointerType ? TOUCH_EDGE : EDGE);
 
         return event.clientX >= rect.left && event.clientX <= rect.left + edge && event.clientY >= rect.top && event.clientY <= rect.bottom;
     }
@@ -590,7 +611,7 @@
         return bar && event.target && event.target.closest && event.target.closest('.sf-toolbar-toggle-button') && bar.contains(event.target);
     }
 
-    document.addEventListener('pointerdown', function (event) {
+    window.addEventListener('pointerdown', function (event) {
         if (0 !== event.button || !bar) {
             return;
         }
@@ -627,11 +648,10 @@
                 }
             }
             event.preventDefault();
-            event.stopPropagation();
         }
-    });
+    }, true);
 
-    document.addEventListener('pointermove', function (event) {
+    window.addEventListener('pointermove', function (event) {
         if (drag) {
             var dx = event.clientX - drag.startX;
             var dy = event.clientY - drag.startY;
@@ -647,8 +667,15 @@
 
         if (resize) {
             content.style.width = Math.max(Math.min(MIN_WIDTH, fullWidth), clampWidth(resize.right - event.clientX - chrome())) + 'px';
+
+            return;
         }
-    });
+
+        /* The resizing cursor over the whole edge, not only over the grip. */
+        if (RESIZABLE && content && 'mouse' === event.pointerType) {
+            content.classList.toggle('profiler-pack-edge', onLeftEdge(event));
+        }
+    }, true);
 
     function release(event) {
         if (drag) {
@@ -678,11 +705,13 @@
         if (resize) {
             write(WIDTH_KEY, String(Math.round(width())));
             resize = null;
+            /* Kept where it was while it was resized, under the pointer; clear of the page's panels once let go. */
+            settle();
         }
     }
 
-    document.addEventListener('pointerup', release);
-    document.addEventListener('pointercancel', release);
+    window.addEventListener('pointerup', release, true);
+    window.addEventListener('pointercancel', release, true);
 
     /* The click a phone sends after the second tap of a double tap lands where the handle was: the toolbar has moved away by then, so it would reach the page under it (a link, a cookie panel). It reaches nothing; the toolbar's state is set by foldAside. Caught on the window, before any listener of the page. */
     window.addEventListener('click', function (event) {
@@ -694,7 +723,7 @@
     }, true);
 
     /* A move that ends on the handle is not a click on it: the toolbar stays open or closed as it was. */
-    document.addEventListener('click', function (event) {
+    window.addEventListener('click', function (event) {
         if (!onHandle(event)) {
             swallowClick = false;
 
@@ -726,7 +755,7 @@
     }
 
     if (MINIMIZABLE) {
-        document.addEventListener('dblclick', function (event) {
+        window.addEventListener('dblclick', function (event) {
             if (!bar) {
                 return;
             }
@@ -747,9 +776,8 @@
                 write(WIDTH_KEY, folded ? null : String(FOLDED_WIDTH));
                 resize = null;
                 event.preventDefault();
-                event.stopPropagation();
             }
-        });
+        }, true);
     }
 
     window.addEventListener('resize', settle);
@@ -758,11 +786,11 @@
     }
 
     /* Opened, closed, filled: the toolbar changes size, measured once its transitions are over; a bar or a panel of the page comes and goes, shown or hidden, slides in, scrolls into view. */
-    document.addEventListener('click', function (event) {
+    window.addEventListener('click', function (event) {
         if (onHandle(event)) {
             settle();
         }
-    });
+    }, true);
     document.addEventListener('transitionend', settle);
     document.addEventListener('animationend', settle);
     window.addEventListener('scroll', settle, { passive: true });

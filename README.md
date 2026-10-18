@@ -15,10 +15,13 @@ which installs the profiler itself. This one adds to it.
 - **Move it.** Hold the handle at its right end and drag, with the mouse or a finger. Dragged into
   the upper half of the window, it opens its details downwards. On a touch screen the handle is the
   size of a fingertip.
-- **Resize it.** Pull its left edge. Double-click that edge to fold it to its first block, again to
+- **Resize it.** Pull its left edge (the cursor says where it starts). Double-click that edge to fold it to its first block, again to
   unfold.
 - **Send it aside.** Double-click the handle (double-tap it on a phone): the toolbar slides off to
   the left, its handle staying in view; do it again to bring it back.
+- **It keeps to itself.** A press, a drag or a click on the toolbar never reaches the page's own
+  listeners: a splash that ends at the first press goes on, a panel that closes on a click elsewhere
+  stays open.
 - **It remembers.** Place and width are kept by the browser, from one page to the next.
 - **It stays in the window.** Wherever it is dragged, kept or restored (a place kept on a wide screen,
   read on a phone), its handle and its right end stay in view, inside what the browser shows of the
