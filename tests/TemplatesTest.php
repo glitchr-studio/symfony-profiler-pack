@@ -111,6 +111,25 @@ final class TemplatesTest extends TestCase
     }
 
     /**
+     * Where a hand put it, the toolbar stays: the page's layout (its bottom
+     * bar, its panels, its header, its footer's controls) moves only the
+     * places the pack chooses, its corner and aside. The mark is kept with
+     * the place; a double click gives the pack its say again.
+     */
+    public function testAPlaceChosenByHandIsKeptAsItWasPut(): void
+    {
+        $js = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.js.twig');
+
+        self::assertStringContainsString('var page = !moving && !hand;', $js);
+        self::assertStringContainsString('var shown = page ? clampPosition(nx, ny, true, true) : clamped;', $js);
+        self::assertStringContainsString("return (page ? Math.min(bottom, window.innerHeight - pageBottomBar()) : bottom) - MARGIN;", $js);
+        self::assertMatchesRegularExpression('~hand = true;\s*var placed = place\(drag\.fromX~', $js);
+        self::assertStringContainsString('write(POSITION_KEY, JSON.stringify({ x: x, y: y, hand: true }));', $js);
+        self::assertMatchesRegularExpression('~function foldAside\(toggle\) \{.*?hand = false;.*?write\(POSITION_KEY, JSON\.stringify\(\{ x: x, y: y, hand: false \}\)\);~s', $js);
+        self::assertStringContainsString("hand = DRAGGABLE && !!position && ('hand' in position ? true === position.hand : 0 !== y);", $js);
+    }
+
+    /**
      * Resized, the toolbar stays where it is under the pointer, as it does
      * while it is moved: it is kept clear of the page's panels once let go.
      */
@@ -171,12 +190,12 @@ final class TemplatesTest extends TestCase
     {
         $js = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.js.twig');
 
-        foreach (['function bounds()', 'function floor()', 'function pageBottomBar()', 'function settle()', 'window.visualViewport', 'document.elementsFromPoint', "'transitionend'"] as $used) {
+        foreach (['function bounds()', 'function floor(page)', 'function pageBottomBar()', 'function settle()', 'window.visualViewport', 'document.elementsFromPoint', "'transitionend'"] as $used) {
             self::assertStringContainsString($used, $js);
         }
         self::assertStringContainsString('var minX = MARGIN - box.handleLeft;', $js, 'Sent aside, the handle stays in view.');
         self::assertStringContainsString('var maxX = Math.max(minX, window.innerWidth - MARGIN - box.right);', $js, 'Its right end never leaves the window.');
-        self::assertStringContainsString('var maxY = Math.max(minY, floor() - box.bottom);', $js);
+        self::assertStringContainsString('var maxY = Math.max(minY, floor(page) - box.bottom);', $js);
         self::assertStringNotContainsString('Math.min(2 * PADDING', $js, 'The old bound let the handle out on the right.');
     }
 
@@ -252,7 +271,7 @@ final class TemplatesTest extends TestCase
         self::assertStringContainsString('if (list[i].bottom - list[i].top < window.innerHeight * TALL) {', $js, 'A side rail is kept clear of by its controls, not sent over the top.');
 
         /* Shown clear of the panels, kept where it was asked. */
-        self::assertStringContainsString("var shown = moving ? clamped : clampPosition(nx, ny, true);\n        bar.style.transform = 'translate(' + shown.x + 'px, ' + shown.y + 'px)';\n        applied = shown;\n\n        return clamped;", $js);
+        self::assertStringContainsString("var shown = page ? clampPosition(nx, ny, true, true) : clamped;\n        bar.style.transform = 'translate(' + shown.x + 'px, ' + shown.y + 'px)';\n        applied = shown;\n\n        return clamped;", $js);
         self::assertStringContainsString('place(drag.fromX + dx, drag.fromY + dy, true);', $js, 'Not while it is being moved.');
 
         /* A panel shown or hidden, sliding in, scrolled into view. */

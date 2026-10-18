@@ -33,8 +33,8 @@ source for both.
 
 ## What is kept in the browser
 
-Two entries of `localStorage`, per origin: `profiler-pack/toolbar/position` (`{"x": …, "y": …}`, an
-offset from the bottom right corner) and `profiler-pack/toolbar/width`. Removing them puts the toolbar
+Two entries of `localStorage`, per origin: `profiler-pack/toolbar/position` (`{"x": …, "y": …,
+"hand": …}`, an offset from the bottom right corner, and whether a hand put it there) and `profiler-pack/toolbar/width`. Removing them puts the toolbar
 back. Symfony's own entry for the open or closed toolbar is left alone.
 
 The position kept is the one asked for. Where the toolbar is shown may be nearer, never farther out:
@@ -47,6 +47,13 @@ The position kept is the one asked for. Where the toolbar is shown may be nearer
   three points of the window's last line (`document.elementsFromPoint`): a `position: fixed` element
   touching the bottom, at least half the window wide and at most 120px (and a quarter of the window)
   high. A taller one is a panel, not a bar: the toolbar keeps clear of it as below.
+
+That last bound, and everything below (the page's panels, its own controls), is for the places the
+pack chooses: the corner, and aside. A place chosen by hand, a drag let go, is shown as it was put,
+inside the window and what the browser shows, nothing else: the page's header, its bars, its panels,
+its footer never move it. A double click or a double tap, which sends the toolbar aside or back to
+its corner, gives the pack its say again. A place kept before the mark existed counts as chosen by hand
+unless it is on the bottom line, where the corner and the place aside are.
 
 ## Clear of the page's panels
 
