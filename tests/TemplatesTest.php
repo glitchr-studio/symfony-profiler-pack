@@ -271,7 +271,10 @@ final class TemplatesTest extends TestCase
         self::assertStringContainsString('if (list[i].bottom - list[i].top < window.innerHeight * TALL) {', $js, 'A side rail is kept clear of by its controls, not sent over the top.');
 
         /* Shown clear of the panels, kept where it was asked. */
-        self::assertStringContainsString("var shown = page ? clampPosition(nx, ny, true, true) : clamped;\n        bar.style.transform = 'translate(' + shown.x + 'px, ' + shown.y + 'px)';\n        applied = shown;\n\n        return clamped;", $js);
+        self::assertStringContainsString("var shown = page ? clampPosition(nx, ny, true, true) : clamped;\n        bar.classList.toggle('sf-toolbar-veiled', veiled);\n        bar.style.transform = 'translate(' + shown.x + 'px, ' + shown.y + 'px)';\n        applied = shown;\n\n        return clamped;", $js);
+        // A floating panel cleared only by a long climb (a cookie question as wide as a phone): out of sight, not over the page.
+        self::assertStringContainsString("if (panelsOnly.length && ny - solve(panelsOnly) > CLIMB) {\n                veiled = true;\n                return ny;", $js);
+        self::assertStringContainsString('.sf-toolbar.sf-toolbar-veiled { opacity: 0 !important; pointer-events: none !important;', $css ?? file_get_contents(dirname(__DIR__).'/templates/Toolbar/floating.css.twig'));
         self::assertStringContainsString('place(drag.fromX + dx, drag.fromY + dy, true);', $js, 'Not while it is being moved.');
 
         /* A panel shown or hidden, sliding in, scrolled into view. */
