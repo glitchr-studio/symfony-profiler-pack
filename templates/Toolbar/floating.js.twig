@@ -25,7 +25,9 @@
    would cover one, it is shown at the nearest height clear of the panel, up
    first (of a panel nearly as high as the window, a side rail or a drawer,
    clear of its controls); when no height is, clear of the controls; when none
-   is either, where it was. The place asked for is left as it was: the panel closed, the
+   is either, where it was. A floating panel it could clear only by climbing far up
+   the window (a cookie question as wide as a phone) sends it out of sight instead,
+   until the panel closes. The place asked for is left as it was: the panel closed, the
    toolbar goes back. A move does not jump: it is kept clear once let go.
 
    At the end of the page, where nothing scrolls out from under it any more, it
@@ -86,6 +88,7 @@
     var drag = null;
     var resize = null;
     var hand = false;       /* the place was chosen by hand (a drag): kept as it was put, the page's layout aside */
+    var veiled = false;     /* out of sight while a floating panel (a cookie question on a phone) could only be cleared by climbing far over the page */
     var swallowClick = false;
     var openBeforeClicks = true;
     var lastDown = 0;
@@ -424,6 +427,11 @@
             for (var p = 0; p < found.length; p++) {
                 (found[p].page ? own : panelsOnly).push(found[p]);
             }
+            /* A floating panel (a cookie question as wide as a phone) cleared only by climbing far up the window: rather than land on the page (the name over its picture), the toolbar steps out of sight where it is, until the panel closes or shrinks. */
+            if (panelsOnly.length && ny - solve(panelsOnly) > CLIMB) {
+                veiled = true;
+                return ny;
+            }
             if (own.length) {
                 y = fewestCovered(own, panelsOnly, panelsOnly.length ? solve(panelsOnly) : ny);
             }
@@ -515,7 +523,9 @@
     function place(nx, ny, moving) {
         var page = !moving && !hand;
         var clamped = clampPosition(nx, ny, false, page);
+        veiled = false;
         var shown = page ? clampPosition(nx, ny, true, true) : clamped;
+        bar.classList.toggle('sf-toolbar-veiled', veiled);
         bar.style.transform = 'translate(' + shown.x + 'px, ' + shown.y + 'px)';
         applied = shown;
 
