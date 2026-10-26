@@ -36,6 +36,20 @@ final class ToolbarTest extends PackTestCase
         self::assertLessThan(strpos($styles, '.sf-toolbarreset.inverted'), strpos($styles, '--sf-toolbar-gray-800'));
     }
 
+    public function testWithTheFixesTheToolbarsStylesheetHoldsNoScript(): void
+    {
+        $client = self::client();
+        $client->request('GET', '/en/page');
+
+        $toolbar = self::toolbarOf($client);
+
+        self::assertStringNotContainsString('<link rel="stylesheet"', $toolbar, 'No stylesheet in the body to hold the parser.');
+        self::assertStringContainsString("link.rel = 'stylesheet'", $toolbar, 'Added by a script instead...');
+        self::assertStringContainsString('_wdt\\/styles', $toolbar, '... the same address...');
+        self::assertStringContainsString('DOMContentLoaded', $toolbar, '... once the document is read.');
+        self::assertStringContainsString('html:not(.sf-wdt-styled) [id^="sfwdt"]', $toolbar, 'The toolbar hidden until its styles are there.');
+    }
+
     public function testWithEverySwitchOffTheToolbarIsTheOneSymfonyShips(): void
     {
         $stock = self::client(null);
