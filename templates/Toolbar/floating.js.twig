@@ -252,6 +252,7 @@
                 return;
             }
             found.push(el);
+            watch(el);
             var rect = visibleRect(el);
             if (!rect || !across(rect)) {
                 return;
@@ -533,6 +534,18 @@
     }
 
     /* Put back inside the window after it, the page or the toolbar changed; the place kept is left as it was. */
+    /* The panels found so far, each watched for a change of size. */
+    var watched = [];
+    var resizes = window.ResizeObserver ? new ResizeObserver(function () { settle(); }) : null;
+
+    function watch(el) {
+        if (!resizes || -1 !== watched.indexOf(el)) {
+            return;
+        }
+        watched.push(el);
+        resizes.observe(el);
+    }
+
     function settle() {
         if (settling) {
             return;
@@ -819,10 +832,47 @@
     document.addEventListener('animationend', settle);
     window.addEventListener('scroll', settle, { passive: true });
 
+    /* What changes inside a panel already found (the cookie question's countdown, each second) is no matter unless the panel changes size, which its ResizeObserver tells; and what changes inside a drawing (an SVG animation's thousands of shapes, glitchr's intro) never moves a panel. Each pass measures the page under a grid of points: on glitchr's intro, a pass a second over its 17,000 shapes froze the animation 80-160 ms each time. */
+    function inPanel(node) {
+        for (var i = 0; i < watched.length; i++) {
+            if (watched[i] !== node && watched[i].contains(node)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    function textOnly(record) {
+        var nodes = Array.prototype.slice.call(record.addedNodes).concat(Array.prototype.slice.call(record.removedNodes));
+        for (var i = 0; i < nodes.length; i++) {
+            if (1 === nodes[i].nodeType) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    function matters(record) {
+        var target = 1 === record.target.nodeType ? record.target : record.target.parentElement;
+        if (!target || (bar && bar.contains(target) && 'attributes' === record.type)) {
+            return false;
+        }
+        if (target.closest && target.closest('svg')) {
+            return false;
+        }
+        if (resizes && inPanel(target) && ('attributes' === record.type || textOnly(record))) {
+            return false;
+        }
+
+        return true;
+    }
+
     acquire();
     new MutationObserver(function (records) {
         for (var i = 0; i < records.length; i++) {
-            if ('attributes' !== records[i].type || !bar || !bar.contains(records[i].target)) {
+            if (!bar || matters(records[i])) {
                 acquire();
                 settle();
 
