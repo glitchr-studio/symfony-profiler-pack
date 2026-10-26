@@ -12,13 +12,25 @@
 <style{% if style_nonce %} nonce="{{ style_nonce }}"{% endif %}>
 {%- if pack.fixes|default(false) -%}
     [id^="sfwdt"]:not(:has(.sf-toolbarreset)) { opacity: 0; pointer-events: none; }
+    html:not(.sf-wdt-styled) [id^="sfwdt"] { visibility: hidden; }
 {%- endif -%}
 {%- if pack.hide_when|default(null) -%}
     {{ pack.hide_when|raw }} .sf-toolbar { display: none !important; }
 {%- endif -%}
 </style>
 {%- endif -%}
-{{- include('@!WebProfiler/Profiler/toolbar_js.html.twig') -}}
+{#- The original links the toolbar's stylesheet in the body, and a stylesheet there holds the parser: every script after it, the page's own too, waits for /_wdt/styles, a whole Symfony request (0.8-3.9 s on glitchr in development, its intro frozen meanwhile). With the fixes it is added once the document is read instead, by a script (it has the nonce; no inline handler, which a strict CSP refuses), the toolbar hidden until it has arrived. The link is replaced only where it is found as Symfony writes it: otherwise the original is left as it is. -#}
+{%- set original = include('@!WebProfiler/Profiler/toolbar_js.html.twig') -%}
+{%- set stylesheet = url('_wdt_stylesheet') -%}
+{%- set link = '<link rel="stylesheet"' ~ (style_nonce ? ' nonce="' ~ style_nonce|e('html_attr') ~ '"' : '') ~ ' href="' ~ stylesheet|e ~ '" />' -%}
+{%- if pack.fixes|default(false) and link in original -%}
+<script{% if script_nonce %} nonce="{{ script_nonce }}"{% endif %}>/*<![CDATA[*/
+(function () { var link = document.createElement('link'); link.rel = 'stylesheet'; link.href = {{ stylesheet|json_encode|raw }};{% if style_nonce %} link.nonce = {{ style_nonce|json_encode|raw }};{% endif %} link.addEventListener('load', function () { document.documentElement.classList.add('sf-wdt-styled'); }); var add = function () { document.head.appendChild(link); }; if ('loading' === document.readyState) { document.addEventListener('DOMContentLoaded', add); } else { add(); } })();
+/*]]>*/</script>
+{{- original|replace({(link): ''})|raw -}}
+{%- else -%}
+{{- original -}}
+{%- endif -%}
 {%- if pack.draggable|default(false) or pack.resizable|default(false) or pack.minimizable|default(false) -%}
 <script{% if script_nonce %} nonce="{{ script_nonce }}"{% endif %}>/*<![CDATA[*/
 {{ include('@ProfilerPack/Toolbar/floating.js.twig', {pack: pack}) }}
