@@ -43,7 +43,11 @@ abstract class PackTestCase extends WebTestCase
 
         $toolbar = str_replace((string) $client->getResponse()->headers->get('X-Debug-Token'), 'TOKEN', $matches[1]);
 
-        return preg_replace('~ nonce="[^"]+"~', ' nonce="NONCE"', $toolbar);
+        // The nonces are drawn anew for each answer. They are in the nonce attributes, and Symfony 8.1's toolbar
+        // writes them in its script too (the X-SymfonyProfiler-*-Nonce headers of its requests): every place.
+        preg_match_all('~ nonce="([^"]+)"~', $toolbar, $nonces);
+
+        return str_replace(array_values(array_unique($nonces[1])), 'NONCE', $toolbar);
     }
 
     /** The toolbar's styles, as the page links them. */

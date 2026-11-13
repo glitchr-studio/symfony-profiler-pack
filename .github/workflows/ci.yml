@@ -4,6 +4,12 @@ on:
   push:
     branches: ['1.x']
   pull_request:
+  workflow_dispatch:
+  # release.yml runs this CI on a tag before the release.
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   tests:
@@ -12,15 +18,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # No 8.0.* row: every Symfony 8.0 release is affected by PKSA-jvt1-tggb-8w72 (fixed in 7.4.23
+        # and 8.1.11, never in 8.0, which is no longer maintained), so Composer refuses to install it.
         include:
           - { php: '8.2', symfony: '7.4.*' }
           - { php: '8.4', symfony: '7.4.*' }
-          - { php: '8.4', symfony: '8.0.*' }
           - { php: '8.4', symfony: '8.1.*' }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: ${{ matrix.php }}
           coverage: none

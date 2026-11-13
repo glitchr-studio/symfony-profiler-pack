@@ -33,6 +33,11 @@
             "Glitchr\\ProfilerPack\\Tests\\": "tests/"
         }
     },
+    "extra": {
+        "branch-alias": {
+            "dev-1.x": "1.x-dev"
+        }
+    },
     "config": {
         "sort-packages": true
     }
