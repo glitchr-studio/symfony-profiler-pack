@@ -30,6 +30,12 @@ which installs the profiler itself. This one adds to it.
 - **It covers no button of the page's panels.** A cookie question floating at the bottom, a dialog, a
   chat button: the toolbar is shown just above it (or at the nearest height clear of it) while it is
   open, and goes back once it is closed. A page can mark anything else with `data-toolbar-avoid`.
+  That is decided when a panel comes or goes, never on a scroll, and never while the pointer is over
+  the toolbar.
+- **The page's own content never moves it.** Scrolling, the end of the page, a footer's links under
+  it: the toolbar stays where it is. Open along the bottom of the window, it gives the page room
+  instead (`--profiler-pack-room`, as padding below the document's end), so the footer's last line
+  scrolls up above it.
 - **Where you put it, it stays.** Making way for the page is for the places the pack chooses, its
   corner and aside. Dragged and let go, the toolbar stays exactly there, the window alone bounding
   it: no header, bar, panel or footer of the page moves it. A double click hands it back.
@@ -128,7 +134,7 @@ php -S localhost:8000 -t tests/App/public tests/App/public/index.php
 toolbar keep above it; `/en/page/cookie-panel` adds a cookie question floating over that navigation,
 to see the toolbar keep clear of its buttons, open them out ("Customise") and come back down once it
 is answered. `/en/page/fixed-menu` is a long page with a "Menu" button fixed in the bottom right
-corner, which the toolbar keeps clear of before the end of the page too; `/en/page/countdown` an
+corner, under which the toolbar stays put, the page scrolling above it; `/en/page/countdown` an
 introduction laid over the whole window, hiding the footer, with a cookie question counting down
 every second, under which the toolbar stays put.
 

@@ -16,28 +16,32 @@
    of the page (window.visualViewport: not under a browser's own bottom bar),
    and above a bar the page keeps fixed along the bottom of the window.
 
-   Nor does it cover what a visitor presses in a panel the page shows over
-   itself: a cookie question floating at the bottom, a dialog, a chat button.
-   Such a panel is a layer of the page fixed in the window, found under the
-   toolbar's column (document.elementsFromPoint), or an open dialog wherever it
-   is laid (dialog[open], role dialog or alertdialog, aria-modal, the banner of
-   a cookie library, data-toolbar-avoid), holding a control. Where the toolbar
+   The page's own content never moves it: scrolling, reaching the end of the
+   page, a footer's links under it, a control fixed in the window. Instead,
+   while it is open and docked along the bottom of the window, the page is
+   given room under it: the toolbar's height and its gap below are written on
+   <html> as --profiler-pack-room (with data-profiler-pack-room), which
+   floating.css adds below the document's end, so the footer's last line
+   scrolls up above the toolbar rather than the toolbar jumping over it.
+
+   It does make way for a panel the page shows over itself: a cookie question
+   floating at the bottom, a dialog, a chat button. Such a panel is a layer of
+   the page fixed in the window, found under the toolbar's column
+   (document.elementsFromPoint), or an open dialog wherever it is laid
+   (dialog[open], role dialog or alertdialog, aria-modal, the banner of a
+   cookie library, data-toolbar-avoid), holding a control. Where the toolbar
    would cover one, it is shown at the nearest height clear of the panel, up
    first (of a panel nearly as high as the window, a side rail or a drawer,
    clear of its controls); when no height is, clear of the controls; when none
-   is either, where it was. A floating panel it could clear only by climbing far up
-   the window (a cookie question as wide as a phone) sends it out of sight instead,
-   until the panel closes. The place asked for is left as it was: the panel closed, the
-   toolbar goes back. A move does not jump: it is kept clear once let go.
-
-   At the end of the page, where nothing scrolls out from under it any more, it
-   covers no control of the page itself either (a link of the footer, a cookie
-   circle there, its icon included), kept clear of each the same way - for a
-   short climb only: rather than rise far up the window, it stays and covers
-   them. A control fixed or stuck in the window (a "Menu" button, "back to
-   top") is kept clear of so wherever the page is, nothing scrolling it away.
-   A control under another layer is out of reach, the toolbar looked through:
-   where it lies is no reason to move.
+   is either, where it was. A floating panel it could clear only by climbing
+   far up the window (a cookie question as wide as a phone) sends it out of
+   sight instead, until the panel closes. The place asked for is left as it
+   was: the panel closed, the toolbar goes back. That is decided when a panel
+   comes, goes or changes size (the page's changes, consent:change, a
+   ResizeObserver on each panel found), never on a scroll; and never while
+   the pointer is over the toolbar: what is decided meanwhile waits until it
+   leaves, so hovering its blocks moves nothing. A move does not jump: it is
+   kept clear once let go.
 
    All of that is for the places the pack chooses: its corner, and aside. A
    place chosen by hand (a drag let go) is kept as it was put, the window alone
@@ -71,12 +75,10 @@
 
     var CONTROLS = 'a[href], button, input, select, textarea, summary, [role="button"], [role="link"], [role="checkbox"], [role="switch"], [contenteditable="true"], [tabindex]:not([tabindex="-1"])';
     var PANELS = 'dialog[open], [role="dialog"], [role="alertdialog"], [aria-modal="true"], [data-consent-banner], [data-cookie-banner], [data-toolbar-avoid]';
-    var CONSENT = '[data-consent-open], [data-cookie-open], [data-consent], [data-cookie]';   /* what opens the cookie panel: a tap on it must never reach the toolbar */
     var GRID = 32;          /* px between the points a panel is looked for under */
     var PAGE = 0.9;         /* a fixed layer this much of the window each way is the page laid out in it, not a panel */
     var TALL = 0.75;        /* a panel this much of the window high (a side rail, a drawer) is kept clear of by its controls only */
-    var CLIMB = 160;        /* px: the most the toolbar climbs to clear the page's own controls at its end; past that it climbs no more, leaving the page's last line clear */
-    var LINE = 24;          /* px: controls ending this close to the lowest one are the page's last line */
+    var CLIMB = 160;        /* px: the most the toolbar climbs to clear a floating panel; past that it steps out of sight until the panel goes */
 
     var bar = null;
     var content = null;
@@ -89,6 +91,9 @@
     var resize = null;
     var hand = false;       /* the place was chosen by hand (a drag): kept as it was put, the page's layout aside */
     var veiled = false;     /* out of sight while a floating panel (a cookie question on a phone) could only be cleared by climbing far over the page */
+    var hovered = false;    /* the pointer is over the toolbar: nothing but the visitor's own gestures moves it */
+    var waiting = false;    /* a decision put off while it was hovered, taken once the pointer leaves */
+    var room = -1;          /* px given to the page under the toolbar, as last written on <html> */
     var swallowClick = false;
     var openBeforeClicks = true;
     var lastDown = 0;
@@ -211,30 +216,6 @@
         return rect;
     }
 
-    /* What a control shows: its own box and what it holds, an icon spilling out of a link's line included (a footer's icons). */
-    function drawnRect(el) {
-        var rect = visibleRect(el);
-        if (!rect) {
-            return null;
-        }
-        var top = rect.top;
-        var bottom = rect.bottom;
-        var left = rect.left;
-        var right = rect.right;
-        var inside = el.querySelectorAll('*');
-        for (var i = 0; i < inside.length && i < 12; i++) {
-            var child = visibleRect(inside[i]);
-            if (child) {
-                top = Math.min(top, child.top);
-                bottom = Math.max(bottom, child.bottom);
-                left = Math.min(left, child.left);
-                right = Math.max(right, child.right);
-            }
-        }
-
-        return { top: top, bottom: bottom, left: left, right: right, width: right - left, height: bottom - top };
-    }
-
     /* The panels of the page across the toolbar's column, from left to right: each one's top and bottom, and its controls'. */
     function panels(left, right) {
         var found = [];
@@ -307,62 +288,7 @@
             }
         }
 
-        /* At the end of the page nothing scrolls out from under the toolbar any more: a control of the page itself (a link of the footer, its cookie circle) is kept clear of too, each one a panel of its own. Before the end, the page's controls pass under it as it scrolls, and it stays where it is - but for a control fixed or stuck in the window (a community site's "Menu" button, "back to top"), which nothing scrolls away: it is kept clear of wherever the page is, ranked the same way. */
-        var end = atPageEnd();
-        var own = document.querySelectorAll(CONTROLS);
-        for (var k = 0; k < own.length; k++) {
-            var near = own[k].getBoundingClientRect();
-            /* A control a window away from it is no matter, and is not measured (a long page holds thousands). */
-            if (near.bottom < -height || near.top > 2 * height || bar.contains(own[k])) {
-                continue;
-            }
-            var rect = drawnRect(own[k]);
-            if (!rect || !across(rect)) {
-                continue;
-            }
-            var layer = pinned(own[k]);
-            /* Before the end, a layer as high as the window (lesringostars' page scrolls inside a fixed main column, beside a fixed rail) is the page, not a control kept in place: its controls pass under the toolbar as they scroll. */
-            var kept = end || (!!layer && layer.getBoundingClientRect().height < height * TALL);
-            /* Under another layer (glitchr's intro over its footer) a control is out of reach: nothing to keep clear of. */
-            if (kept && !hidden(own[k], rect)) {
-                /* A control of a layer fixed or stuck in the window (a bottom bar, "back to top") is kept clear of, but is no part of the page's last line. */
-                list.push({ top: rect.top, bottom: rect.bottom, controls: [{ top: rect.top, bottom: rect.bottom }], page: true, pinned: !!layer, consent: !!own[k].closest(CONSENT) });
-            }
-        }
-
         return list;
-    }
-
-    /* Another layer lies over the middle of the control. The toolbar itself does not count, and is looked through rather than taken for what is on top: where it lay over a control hidden under another layer (glitchr's footer under its intro), that control counted as in reach, the toolbar climbed off it, the control was hidden again and the toolbar fell back - on every change of the page (the cookie question's countdown, each second). */
-    function hidden(el, rect) {
-        var x = Math.min(Math.max((rect.left + rect.right) / 2, 0), window.innerWidth - 1);
-        var y = Math.min(Math.max((rect.top + rect.bottom) / 2, 0), window.innerHeight - 1);
-        var stack = document.elementsFromPoint ? document.elementsFromPoint(x, y) : [];
-        var hit = null;
-        for (var i = 0; i < stack.length && !hit; i++) {
-            hit = bar.contains(stack[i]) ? null : stack[i];
-        }
-
-        return !!hit && hit !== el && !el.contains(hit) && !hit.contains(el);
-    }
-
-    /* The layer fixed or stuck in the window the element is inside, the nearest one; null when there is none. */
-    function pinned(el) {
-        for (var node = el; node && node !== document.body && node !== document.documentElement; node = node.parentElement) {
-            var position = window.getComputedStyle(node).position;
-            if ('fixed' === position || 'sticky' === position) {
-                return node;
-            }
-        }
-
-        return null;
-    }
-
-    /* The page shows its end: scrolled to the bottom, or no taller than the window. */
-    function atPageEnd() {
-        var root = document.scrollingElement || document.documentElement;
-
-        return window.scrollY + window.innerHeight >= root.scrollHeight - 2;
     }
 
     /* The nearest height, between minY and maxY, at which the toolbar (top to bottom, moved by y) meets none of the rectangles; null when there is none. */
@@ -420,80 +346,14 @@
             return null === y ? ny : y;
         }
 
-        /* The page's own controls (at its end, or fixed in the window) are worth a short climb only: past CLIMB it climbs no more than CLIMB, to a height covering no cookie opener, leaving the page's last line clear (a footer's credits) and covering as few of them as it can, kept clear of the panels. */
+        /* A floating panel (a cookie question as wide as a phone) cleared only by climbing far up the window: rather than land on the page (the name over its picture), the toolbar steps out of sight where it is, until the panel closes or shrinks. */
         var y = solve(found);
         if (ny - y > CLIMB) {
-            var panelsOnly = [];
-            var own = [];
-            for (var p = 0; p < found.length; p++) {
-                (found[p].page ? own : panelsOnly).push(found[p]);
-            }
-            /* A floating panel (a cookie question as wide as a phone) cleared only by climbing far up the window: rather than land on the page (the name over its picture), the toolbar steps out of sight where it is, until the panel closes or shrinks. */
-            if (panelsOnly.length && ny - solve(panelsOnly) > CLIMB) {
-                veiled = true;
-                return ny;
-            }
-            if (own.length) {
-                y = fewestCovered(own, panelsOnly, panelsOnly.length ? solve(panelsOnly) : ny);
-            }
+            veiled = true;
+            return ny;
         }
 
         return y;
-
-        /* Within CLIMB of y, the height covering the fewest cookie openers (a tap there must open the panel, not the profiler), then leaving the page's last line clear (a footer's credits), then covering the fewest fixed controls (the only way to an action while the page scrolls: "back to top"), then the fewest controls, then the nearer. */
-        function fewestCovered(own, panelsOnly, y) {
-            var low = Math.max(minY, y - CLIMB);
-            var keep = [];
-            for (var k = 0; k < panelsOnly.length; k++) {
-                keep = keep.concat(panelsOnly[k].bottom - panelsOnly[k].top < window.innerHeight * TALL ? [panelsOnly[k]] : panelsOnly[k].controls);
-            }
-            var last = -Infinity;
-            for (var l = 0; l < own.length; l++) {
-                if (!own[l].pinned) {
-                    last = Math.max(last, own[l].bottom);
-                }
-            }
-            var tries = [y];
-            for (var i = 0; i < own.length; i++) {
-                tries.push(own[i].top - MARGIN - box.bottom, own[i].bottom + MARGIN - box.top);
-            }
-            var best = null;
-            for (var t = 0; t < tries.length; t++) {
-                var ty = tries[t];
-                if (ty < low || ty > y || ty > maxY || null === nearestClear(keep, box.top, box.bottom, ty, ty, ty)) {
-                    continue;
-                }
-                var count = 0;
-                var lastLine = 0;
-                var consent = 0;
-                var fixed = 0;
-                for (var r = 0; r < own.length; r++) {
-                    if (box.top + ty < own[r].bottom && box.bottom + ty > own[r].top) {
-                        count++;
-                        lastLine = !own[r].pinned && own[r].bottom > last - LINE ? 1 : lastLine;
-                        consent += own[r].consent ? 1 : 0;
-                        fixed += own[r].pinned ? 1 : 0;
-                    }
-                }
-                var rank = [consent, lastLine, fixed, count, -ty];
-                if (null === best || before(rank, best.rank)) {
-                    best = { y: ty, rank: rank };
-                }
-            }
-
-            return null === best ? y : best.y;
-
-            /* Whether one rank comes before another, its first differing term the smaller. */
-            function before(a, b) {
-                for (var i = 0; i < a.length; i++) {
-                    if (a[i] !== b[i]) {
-                        return a[i] < b[i];
-                    }
-                }
-
-                return false;
-            }
-        }
     }
 
     /* Inside the window; and, page true, clear of the page's own bar along the bottom - with clear, of its panels and controls too. */
@@ -519,7 +379,7 @@
         return Math.min(Math.max(fullWidth, MIN_WIDTH), Math.max(FOLDED_WIDTH, width));
     }
 
-    /* Shown at (nx, ny), in the window. Where the pack put it (its corner, aside), it makes way for the page's layout: above its bottom bar, clear of its panels and controls. */
+    /* Shown at (nx, ny), in the window. Where the pack put it (its corner, aside), it makes way for the page's layout: above its bottom bar, clear of its panels. */
     /* Where a hand put it, and while it is moved, nothing of the page moves it: the window alone bounds it. Returns the place in the window, the one to keep. */
     function place(nx, ny, moving) {
         var page = !moving && !hand;
@@ -529,11 +389,36 @@
         bar.classList.toggle('sf-toolbar-veiled', veiled);
         bar.style.transform = 'translate(' + shown.x + 'px, ' + shown.y + 'px)';
         applied = shown;
+        if (!moving) {
+            giveRoom(clamped);
+        }
 
         return clamped;
     }
 
-    /* Put back inside the window after it, the page or the toolbar changed; the place kept is left as it was. */
+    /* Room for the page under the toolbar, open and docked along the bottom of the window (its gap below no more than its own height): its height and that gap, written on <html> for floating.css to add below the document's end. Measured at the place asked for, not where a panel pushed it, so a cookie question coming and going does not change it. */
+    function giveRoom(at) {
+        var box = bounds();
+        var want = 0;
+        if (box && isOpen()) {
+            var top = box.top + at.y;
+            var gap = window.innerHeight - (box.bottom + at.y);
+            want = gap <= box.bottom - box.top ? Math.ceil(window.innerHeight - top) : 0;
+        }
+        if (want === room) {
+            return;
+        }
+        room = want;
+        var root = document.documentElement;
+        if (want > 0) {
+            root.style.setProperty('--profiler-pack-room', want + 'px');
+            root.setAttribute('data-profiler-pack-room', '');
+        } else {
+            root.style.removeProperty('--profiler-pack-room');
+            root.removeAttribute('data-profiler-pack-room');
+        }
+    }
+
     /* The panels found so far, each watched for a change of size. */
     var watched = [];
     var resizes = window.ResizeObserver ? new ResizeObserver(function () { settle(); }) : null;
@@ -546,18 +431,55 @@
         resizes.observe(el);
     }
 
+    /* Put back inside the window after it, the page or the toolbar changed; the place kept is left as it was. A change of the page (a panel, a transition) waits while the pointer is over the toolbar: hovering its blocks moves nothing. */
     function settle() {
+        schedule(false);
+    }
+
+    /* After what the visitor did to the toolbar or the window (opened or closed it, resized either): at once, hovered or not. */
+    function settleNow() {
+        schedule(true);
+    }
+
+    var forced = false;
+
+    function schedule(now) {
+        forced = forced || now;
         if (settling) {
             return;
         }
         settling = true;
         window.requestAnimationFrame(function () {
             settling = false;
+            var force = forced;
+            forced = false;
             if (!bar || drag || resize) {
                 return;
             }
+            if (hovered && !force) {
+                waiting = true;
+                return;
+            }
+            waiting = false;
             place(x, y);
             invert();
+        });
+    }
+
+    /* The pointer over the toolbar, its blocks' panels included (they are inside it). */
+    function hover(el) {
+        if (el.__profilerPackHover) {
+            return;
+        }
+        el.__profilerPackHover = true;
+        el.addEventListener('pointerenter', function () {
+            hovered = true;
+        });
+        el.addEventListener('pointerleave', function () {
+            hovered = false;
+            if (waiting) {
+                settle();
+            }
         });
     }
 
@@ -603,6 +525,8 @@
         bar = currentBar;
         content = currentContent;
         shield(bar);
+        hover(bar);
+        hovered = false;
         applied = { x: 0, y: 0 };
         bar.style.transform = '';
 
@@ -742,7 +666,7 @@
             write(WIDTH_KEY, String(Math.round(width())));
             resize = null;
             /* Kept where it was while it was resized, under the pointer; clear of the page's panels once let go. */
-            settle();
+            settleNow();
         }
     }
 
@@ -787,7 +711,7 @@
             if (toggle && openBeforeClicks === bar.classList.contains('sf-toolbar-closed')) {
                 toggle.click();
             }
-            settle();
+            settleNow();
         }, 0);
     }
 
@@ -817,20 +741,20 @@
         }, true);
     }
 
-    window.addEventListener('resize', settle);
+    window.addEventListener('resize', settleNow);
     if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', settle);
+        window.visualViewport.addEventListener('resize', settleNow);
     }
 
-    /* Opened, closed, filled: the toolbar changes size, measured once its transitions are over; a bar or a panel of the page comes and goes, shown or hidden, slides in, scrolls into view. */
+    /* Opened, closed, filled: the toolbar changes size, measured once its transitions are over; a bar or a panel of the page comes and goes, shown or hidden, slides in, a cookie question is answered. Not on a scroll: what scrolls is the page's content, which never moves the toolbar (the room under it is there for the page's end). */
     window.addEventListener('click', function (event) {
         if (onHandle(event)) {
-            settle();
+            settleNow();
         }
     }, true);
-    document.addEventListener('transitionend', settle);
-    document.addEventListener('animationend', settle);
-    window.addEventListener('scroll', settle, { passive: true });
+    document.addEventListener('transitionend', function () { settle(); });
+    document.addEventListener('animationend', function () { settle(); });
+    window.addEventListener('consent:change', function () { settle(); });
 
     /* What changes inside a panel already found (the cookie question's countdown, each second) is no matter unless the panel changes size, which its ResizeObserver tells; and what changes inside a drawing (an SVG animation's thousands of shapes, glitchr's intro) never moves a panel. Each pass measures the page under a grid of points: on glitchr's intro, a pass a second over its 17,000 shapes froze the animation 80-160 ms each time. */
     function inPanel(node) {

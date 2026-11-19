@@ -1,6 +1,7 @@
 {# The floating toolbar: a rounded bar over the page's bottom right corner, in
    place of the strip across its bottom. Every rule is under a .sf-toolbar*
-   class of WebProfilerBundle: nothing here reaches the page being debugged. #}
+   class of WebProfilerBundle, but the last one: the room given to the page
+   under the toolbar, on <html> only while floating.js marks it. #}
 .sf-toolbar-block:hover .sf-toolbar-info
 {
   position:fixed;
@@ -603,3 +604,9 @@ padding:0;
 
 /* Out of sight while a floating panel could be cleared only by climbing far over the page (floating.js: veiled). */
 .sf-toolbar.sf-toolbar-veiled { opacity: 0 !important; pointer-events: none !important; transition: opacity .2s; }
+
+/* Room for the page under the toolbar while it is open and docked along the bottom of the window (floating.js: giveRoom): the document ends that much lower, so its last line (a footer's links) scrolls up above the toolbar, and what is scrolled to (an anchor, a focused field) stops above it too. On <html>, not <body>: a body laid out as a flex column or at min-height: 100vh keeps its own layout, and the padding shows the page's background. */
+html[data-profiler-pack-room] {
+    padding-bottom: var(--profiler-pack-room) !important;
+    scroll-padding-bottom: var(--profiler-pack-room);
+}

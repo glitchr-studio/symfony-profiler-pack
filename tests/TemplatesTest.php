@@ -27,6 +27,10 @@ final class TemplatesTest extends TestCase
         foreach ($rules[1] as $selectors) {
             foreach (explode(',', $selectors) as $selector) {
                 $selector = trim($selector);
+                // The one rule on the page: the room under the docked toolbar, only while floating.js marks <html>.
+                if ('html[data-profiler-pack-room]' === $selector) {
+                    continue;
+                }
                 self::assertMatchesRegularExpression(
                     '~^(div)?(\.sf-(toolbar|minitoolbar|cancel-button)|\[id\^="sfwdt"\])~',
                     $selector,
@@ -138,7 +142,7 @@ final class TemplatesTest extends TestCase
         $js = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.js.twig');
 
         self::assertStringContainsString('if (!bar || drag || resize) {', $js);
-        self::assertMatchesRegularExpression('~write\(WIDTH_KEY, String\(Math\.round\(width\(\)\)\)\);\s*resize = null;\s*(/\*.*?\*/\s*)?settle\(\);~s', $js);
+        self::assertMatchesRegularExpression('~write\(WIDTH_KEY, String\(Math\.round\(width\(\)\)\)\);\s*resize = null;\s*(/\*.*?\*/\s*)?settleNow\(\);~s', $js);
 
         $css = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.css.twig');
         self::assertMatchesRegularExpression('~\.sf-toolbarreset\.profiler-pack-edge\s*\{\s*cursor:\s*ew-resize;~', $css);
@@ -271,16 +275,20 @@ final class TemplatesTest extends TestCase
         self::assertStringContainsString('if (list[i].bottom - list[i].top < window.innerHeight * TALL) {', $js, 'A side rail is kept clear of by its controls, not sent over the top.');
 
         /* Shown clear of the panels, kept where it was asked. */
-        self::assertStringContainsString("var shown = page ? clampPosition(nx, ny, true, true) : clamped;\n        bar.classList.toggle('sf-toolbar-veiled', veiled);\n        bar.style.transform = 'translate(' + shown.x + 'px, ' + shown.y + 'px)';\n        applied = shown;\n\n        return clamped;", $js);
+        self::assertStringContainsString("var shown = page ? clampPosition(nx, ny, true, true) : clamped;\n        bar.classList.toggle('sf-toolbar-veiled', veiled);\n        bar.style.transform = 'translate(' + shown.x + 'px, ' + shown.y + 'px)';\n        applied = shown;", $js);
         // A floating panel cleared only by a long climb (a cookie question as wide as a phone): out of sight, not over the page.
-        self::assertStringContainsString("if (panelsOnly.length && ny - solve(panelsOnly) > CLIMB) {\n                veiled = true;\n                return ny;", $js);
+        self::assertSame(1, preg_match('~var CLIMB = (\d+);~', $js, $climb));
+        self::assertLessThanOrEqual(200, (int) $climb[1]);
+        self::assertStringContainsString("if (ny - y > CLIMB) {\n            veiled = true;\n            return ny;", $js);
+        // A dialog over the whole page (lesringostars' intro) is no page laid out: its controls are kept clear of (the toolbar lay on its enter button).
+        self::assertMatchesRegularExpression('~if \(el\.matches && el\.matches\(PANELS\)\) \{\s+var own = el\.querySelectorAll\(CONTROLS\);~', $js);
         self::assertStringContainsString('.sf-toolbar.sf-toolbar-veiled { opacity: 0 !important; pointer-events: none !important;', $css ?? file_get_contents(dirname(__DIR__).'/templates/Toolbar/floating.css.twig'));
         self::assertStringContainsString('place(drag.fromX + dx, drag.fromY + dy, true);', $js, 'Not while it is being moved.');
 
-        /* A panel shown or hidden, sliding in, scrolled into view. */
+        /* A panel shown or hidden, sliding in, a cookie question answered. */
         self::assertStringContainsString("attributes: true, attributeFilter: ['hidden', 'class', 'open', 'aria-hidden', 'aria-expanded']", $js);
-        self::assertStringContainsString("document.addEventListener('animationend', settle);", $js);
-        self::assertStringContainsString("window.addEventListener('scroll', settle, { passive: true });", $js);
+        self::assertStringContainsString("document.addEventListener('animationend', function () { settle(); });", $js);
+        self::assertStringContainsString("window.addEventListener('consent:change', function () { settle(); });", $js);
     }
 
     /** @return array<string, array<string, string>> each selector of a block of rules, with its declarations */
@@ -303,66 +311,60 @@ final class TemplatesTest extends TestCase
     }
 
     /**
-     * At the end of the page nothing scrolls out from under the toolbar any
-     * more: a control of the page itself there (glitchr's footer cookie circle,
-     * on a phone) was under it, and a tap on it opened the profiler.
+     * The page's own content never moves the toolbar: no scroll is listened
+     * to, the end of the page and the controls of the page itself (a footer's
+     * links, a "back to top" fixed in the window) are not looked at. Climbing
+     * over the footer at the end of the page read as a toolbar jumping for no
+     * reason (glitchr's forge pages, 76px up as the page reached its end).
      */
-    public function testAtTheEndOfThePageTheToolbarCoversNoControlOfThePage(): void
+    public function testThePagesOwnContentNeverMovesTheToolbar(): void
     {
         $js = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.js.twig');
 
-        self::assertStringContainsString('function atPageEnd()', $js);
-        self::assertStringContainsString("var end = atPageEnd();\n        var own = document.querySelectorAll(CONTROLS);", $js);
-        // A control measured with what it holds (a shop site's footer icons spill out of their links' line).
-        self::assertStringContainsString('var rect = drawnRect(own[k]);', $js);
-        // A short climb only (glitchr's intro: the toolbar rose to the top of the window to clear a column of links).
-        self::assertSame(1, preg_match('~var CLIMB = (\d+);~', $js, $climb));
-        self::assertLessThanOrEqual(200, (int) $climb[1]);
-        self::assertStringContainsString('if (ny - y > CLIMB) {', $js);
-        // Past it, within CLIMB, the page's last line is left clear first (a footer's credits: wineseller's lay under it), then as few controls as can be.
-        self::assertStringContainsString('y = fewestCovered(own, panelsOnly, panelsOnly.length ? solve(panelsOnly) : ny);', $js);
-        self::assertStringContainsString('var low = Math.max(minY, y - CLIMB);', $js);
-        // Cookie openers first (genealogist's circle opened the profiler), then the last line, then the count.
-        // A fixed control is covered after an ordinary link (nakaya-gourmet's "Haut de page").
-        self::assertStringContainsString('var rank = [consent, lastLine, fixed, count, -ty];', $js);
-        // A dialog over the whole page (lesringostars' intro) is no page laid out: its controls are kept clear of (the toolbar lay on its enter button).
-        self::assertMatchesRegularExpression('~if \(el\.matches && el\.matches\(PANELS\)\) \{\s+var own = el\.querySelectorAll\(CONTROLS\);~', $js);
-        // A control fixed or stuck in the window is kept clear of (a shop site's bottom bar, nakaya's "back to top") but is no part of the last line (youtube's bottom navigation); one under another layer is out of reach (glitchr's footer under its intro).
-        self::assertStringContainsString("pinned: !!layer, consent: !!own[k].closest(CONSENT)", $js);
-        self::assertStringContainsString('lastLine = !own[r].pinned && own[r].bottom > last - LINE ? 1 : lastLine;', $js);
-        self::assertStringContainsString('if (kept && !hidden(own[k], rect)) {', $js);
-        self::assertStringContainsString("var CONSENT = '[data-consent-open], [data-cookie-open], [data-consent], [data-cookie]';", $js);
+        self::assertStringNotContainsString("addEventListener('scroll'", $js);
+        foreach (['atPageEnd', 'fewestCovered', 'drawnRect', 'function pinned(', 'function hidden(', 'CONSENT'] as $gone) {
+            self::assertStringNotContainsString($gone, $js);
+        }
     }
 
     /**
-     * A control fixed in the window is kept clear of wherever the page is, not
-     * only at its end: nothing scrolls it out from under the toolbar
-     * (a community site's "Menu" button, the layer itself the control, between the
-     * points a panel is looked for under). A layer as high as the window is
-     * the page laid out in it (lesringostars' main column), not such a control.
+     * Instead, open and docked along the bottom of the window, the toolbar
+     * gives the page room under it: its height and gap written on <html>,
+     * added below the document's end, so the footer's last line scrolls up
+     * above it. Measured at the place asked for, not where a panel pushed it.
      */
-    public function testAtRestTheToolbarKeepsClearOfAControlFixedInTheWindow(): void
+    public function testTheToolbarGivesThePageRoomUnderIt(): void
     {
         $js = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.js.twig');
 
-        self::assertStringContainsString('var kept = end || (!!layer && layer.getBoundingClientRect().height < height * TALL);', $js);
-        self::assertStringContainsString("if ('fixed' === position || 'sticky' === position) {\n                return node;", $js, 'The layer, measured.');
-        self::assertStringNotContainsString('if (atPageEnd()) {', $js, 'The page\'s controls are looked at before its end too, the fixed ones kept.');
+        self::assertMatchesRegularExpression('~applied = shown;\s*if \(!moving\) \{\s*giveRoom\(clamped\);~', $js);
+        self::assertStringContainsString("if (box && isOpen()) {", $js, 'Closed, the handle alone asks no room.');
+        self::assertStringContainsString("want = gap <= box.bottom - box.top ? Math.ceil(window.innerHeight - top) : 0;", $js, 'Docked along the bottom only.');
+        self::assertStringContainsString("root.style.setProperty('--profiler-pack-room', want + 'px');", $js);
+        self::assertStringContainsString("root.setAttribute('data-profiler-pack-room', '');", $js);
+        self::assertStringContainsString("root.removeAttribute('data-profiler-pack-room');", $js);
+
+        $css = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.css.twig');
+        $css = preg_replace(['~\{#.*?#\}~s', '~/\*.*?\*/~s'], '', $css);
+        $rules = self::rulesOf($css);
+        self::assertSame('var(--profiler-pack-room) !important', $rules['html[data-profiler-pack-room]']['padding-bottom']);
+        self::assertSame('var(--profiler-pack-room)', $rules['html[data-profiler-pack-room]']['scroll-padding-bottom']);
     }
 
     /**
-     * Whether a control is under another layer is told under the toolbar, not
-     * on top of it: lying over a control hidden by glitchr's intro, the
-     * toolbar took it for in reach, climbed off it onto the enter button and
-     * the cookie circle, found it hidden again and fell back, on each tick of
-     * the cookie question's countdown.
+     * Hovering the toolbar never moves it: a change of the page decided while
+     * the pointer is over it waits until it leaves. What the visitor does to
+     * the toolbar or the window (open, close, resize) is done at once.
      */
-    public function testWhatLiesUnderTheToolbarIsToldWithoutIt(): void
+    public function testHoveringTheToolbarNeverMovesIt(): void
     {
         $js = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.js.twig');
 
-        self::assertSame(1, preg_match('~function hidden\(el, rect\) \{(.*?)\n    \}~s', $js, $hidden));
-        self::assertStringNotContainsString('elementFromPoint(', $hidden[1], 'The topmost element at a point may be the toolbar itself.');
-        self::assertStringContainsString('hit = bar.contains(stack[i]) ? null : stack[i];', $hidden[1], 'The first element under it that is not the toolbar\'s.');
+        self::assertMatchesRegularExpression('~if \(hovered && !force\) \{\s*waiting = true;\s*return;~', $js);
+        self::assertMatchesRegularExpression("~addEventListener\('pointerleave', function \(\) \{\s*hovered = false;\s*if \(waiting\) \{\s*settle\(\);~", $js);
+        self::assertStringContainsString('hover(bar);', $js);
+        self::assertStringContainsString("window.addEventListener('resize', settleNow);", $js);
+        self::assertMatchesRegularExpression('~if \(onHandle\(event\)\) \{\s*settleNow\(\);~', $js, 'Opened or closed by the visitor.');
+        self::assertStringContainsString('new ResizeObserver(function () { settle(); })', $js);
     }
 }

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Changed
+
+- The floating toolbar no longer moves because of the page's own content. It climbed up to 160px at the end of the
+  page to clear the footer's links, and kept clear of controls fixed in the window, re-decided on every scroll: it
+  read as a toolbar jumping for no reason. Open and docked along the bottom of the window, it now gives the page
+  room under it (`--profiler-pack-room` on `<html>`, added as padding below the document's end), so the footer's last
+  line scrolls up above it. It still makes way for the page's panels (a cookie question, a dialog), decided when one
+  comes, goes or changes size, never on a scroll, and never while the pointer is over the toolbar.
+
 ## [1.0.0] - 2026-11-13
 
 The first tagged release: `composer require --dev glitchr/symfony-profiler-pack` installs it in a project with
