@@ -10,9 +10,10 @@
    toolbar's content is replaced by every load (.sf-toolbarreset is a new
    element each time): it is looked up again on each change of the page.
 
-   Wherever it is put, kept or restored, the toolbar stays in the window: its
-   handle and its right end never leave it (its body may slide off to the left,
-   which is what sending it aside does), it stays inside what the browser shows
+   Wherever it is put, kept or restored, the toolbar stays in the window: the
+   tip of its handle (the grip, TIP) and its right end never leave it (its body
+   and the rest of its handle may slide off to the left, which is what sending
+   it aside does: the grip alone is left at the edge), it stays inside what the browser shows
    of the page (window.visualViewport: not under a browser's own bottom bar),
    and above a bar the page keeps fixed along the bottom of the window.
 
@@ -71,6 +72,7 @@
 
     var NAV_HEIGHT = 120;   /* px: a bar fixed along the bottom of the window, not a panel */
     var MARGIN = 4;
+    var TIP = 26;           /* px: the end of the handle that stays in the window, its grip (the two lines, floating.css) */
     var ASIDE = 24;         /* px: a handle this close to the left edge is aside (an open and a closed handle are not as wide) */
 
     var CONTROLS = 'a[href], button, input, select, textarea, summary, [role="button"], [role="link"], [role="checkbox"], [role="switch"], [contenteditable="true"], [tabindex]:not([tabindex="-1"])';
@@ -200,7 +202,7 @@
 
         return {
             left: (visible ? Math.min(pill.left, knob.left) : knob.left) - applied.x,
-            handleLeft: knob.left - applied.x,
+            tipLeft: knob.right - TIP - applied.x,
             right: (visible ? Math.max(pill.right, knob.right) : knob.right) - applied.x,
             top: (visible ? Math.min(pill.top, knob.top) : knob.top) - applied.y,
             bottom: (visible ? Math.max(pill.bottom, knob.bottom) : knob.bottom) - applied.y
@@ -362,7 +364,7 @@
         if (!box) {
             return { x: nx, y: ny };
         }
-        var minX = MARGIN - box.handleLeft;
+        var minX = -box.tipLeft;
         var maxX = Math.max(minX, window.innerWidth - MARGIN - box.right);
         var minY = MARGIN - box.top;
         var maxY = Math.max(minY, floor(page) - box.bottom);
@@ -699,7 +701,7 @@
     /* Sent to the left edge, its handle staying in view; back to its corner when it is there already. Open or closed as it was before the clicks. */
     function foldAside(toggle) {
         var box = bounds();
-        var left = box ? MARGIN - box.handleLeft : -(window.innerWidth - 5 * PADDING);
+        var left = box ? -box.tipLeft : -(window.innerWidth - 5 * PADDING);
         var aside = applied.x <= left + ASIDE;
         hand = false;
         var placed = place(aside ? 0 : left, 0);

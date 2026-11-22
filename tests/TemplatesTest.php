@@ -197,7 +197,7 @@ final class TemplatesTest extends TestCase
         foreach (['function bounds()', 'function floor(page)', 'function pageBottomBar()', 'function settle()', 'window.visualViewport', 'document.elementsFromPoint', "'transitionend'"] as $used) {
             self::assertStringContainsString($used, $js);
         }
-        self::assertStringContainsString('var minX = MARGIN - box.handleLeft;', $js, 'Sent aside, the handle stays in view.');
+        self::assertStringContainsString('var minX = -box.tipLeft;', $js, 'Sent aside, the grip at the end of the handle stays in view.');
         self::assertStringContainsString('var maxX = Math.max(minX, window.innerWidth - MARGIN - box.right);', $js, 'Its right end never leaves the window.');
         self::assertStringContainsString('var maxY = Math.max(minY, floor(page) - box.bottom);', $js);
         self::assertStringNotContainsString('Math.min(2 * PADDING', $js, 'The old bound let the handle out on the right.');
@@ -233,14 +233,14 @@ final class TemplatesTest extends TestCase
 
     /**
      * A double tap (or click) on the handle sends the toolbar aside, to the
-     * left edge with its handle in view, from wherever it is; once it is
+     * left edge with only the grip of its handle in view, from wherever it is; once it is
      * there, the next one brings it back to its corner.
      */
     public function testADoubleTapSendsTheToolbarAsideThenBack(): void
     {
         $js = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.js.twig');
 
-        self::assertStringContainsString('var left = box ? MARGIN - box.handleLeft : -(window.innerWidth - 5 * PADDING);', $js, 'Aside: the handle at the left edge.');
+        self::assertStringContainsString('var left = box ? -box.tipLeft : -(window.innerWidth - 5 * PADDING);', $js, 'Aside: only the grip at the left edge.');
         self::assertStringContainsString('var aside = applied.x <= left + ASIDE;', $js, 'Back only from there, not from half way.');
         self::assertStringContainsString('var placed = place(aside ? 0 : left, 0);', $js);
         self::assertStringNotContainsString('left / 2', $js, 'A toolbar dragged half way left was taken for aside and sent back.');

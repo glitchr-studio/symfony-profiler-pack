@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.2] - unreleased
+
+### Changed
+
+- Sent aside (a double click or a double tap on the handle), the floating toolbar leaves only the grip at the end of
+  its handle in the window, the two lines, at the left edge: the whole handle stayed, the close button with it. A
+  double click on the grip brings it back. A toolbar dragged to the left edge can go as far.
+
 ## [1.0.1] - 2026-11-20
 
 ### Changed
