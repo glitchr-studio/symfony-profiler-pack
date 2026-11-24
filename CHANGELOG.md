@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.3] - 2026-11-24
+
+### Fixed
+
+- The blocks Symfony puts at the right end of the toolbar (its version, the PHP configuration) are there again: the
+  floating toolbar is a flex row, where the core's `float: right` does nothing, so they followed the other blocks.
+
 ## [1.0.2] - 2026-11-24
 
 ### Changed

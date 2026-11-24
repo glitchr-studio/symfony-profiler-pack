@@ -63,6 +63,11 @@ div.sf-toolbar .sf-toolbar-block .sf-toolbar-info-piece a { padding:0 0.25em; }
     margin-right: 0em;
 }
 
+/* The blocks Symfony floats right (its version, the PHP config): a float means nothing in a flex
+   row, so the first of them takes the free room on its left and they end the bar, as in the core's. */
+.sf-toolbarreset > .sf-toolbar-block-right { margin-left: auto; }
+.sf-toolbarreset > .sf-toolbar-block-right ~ .sf-toolbar-block-right { margin-left: 0; }
+
 .sf-cancel-button {
     border-radius: 1em;
     border: 0;
