@@ -1,12 +1,17 @@
 # Changelog
 
-## [1.0.2] - unreleased
+## [1.0.2] - 2026-11-24
 
 ### Changed
 
 - Sent aside (a double click or a double tap on the handle), the floating toolbar leaves only the grip at the end of
   its handle in the window, the two lines, at the left edge: the whole handle stayed, the close button with it. A
   double click on the grip brings it back. A toolbar dragged to the left edge can go as far.
+- The toolbar no longer slows a busy page. The page's fixed layers (a cookie question, a bottom bar) are found by one
+  walk of the document instead of hit tests under a grid of points, which cost seconds on a page of thousands of drawn
+  shapes. A change of the page is measured when the browser is idle, every change of a burst in one pass, instead of
+  in the next frame: a page changing on every frame (a line typed letter by letter) no longer lags while it scrolls.
+  Text changes, and transitions or animations of anything but a panel, no longer start a pass.
 
 ## [1.0.1] - 2026-11-20
 

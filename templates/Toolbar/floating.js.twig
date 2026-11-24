@@ -27,8 +27,8 @@
 
    It does make way for a panel the page shows over itself: a cookie question
    floating at the bottom, a dialog, a chat button. Such a panel is a layer of
-   the page fixed in the window, found under the toolbar's column
-   (document.elementsFromPoint), or an open dialog wherever it is laid
+   the page fixed in the window across the toolbar's column (found by one walk
+   of the document, fixedLayers), or an open dialog wherever it is laid
    (dialog[open], role dialog or alertdialog, aria-modal, the banner of a
    cookie library, data-toolbar-avoid), holding a control. Where the toolbar
    would cover one, it is shown at the nearest height clear of the panel, up
@@ -77,7 +77,6 @@
 
     var CONTROLS = 'a[href], button, input, select, textarea, summary, [role="button"], [role="link"], [role="checkbox"], [role="switch"], [contenteditable="true"], [tabindex]:not([tabindex="-1"])';
     var PANELS = 'dialog[open], [role="dialog"], [role="alertdialog"], [aria-modal="true"], [data-consent-banner], [data-cookie-banner], [data-toolbar-avoid]';
-    var GRID = 32;          /* px between the points a panel is looked for under */
     var PAGE = 0.9;         /* a fixed layer this much of the window each way is the page laid out in it, not a panel */
     var TALL = 0.75;        /* a panel this much of the window high (a side rail, a drawer) is kept clear of by its controls only */
     var CLIMB = 160;        /* px: the most the toolbar climbs to clear a floating panel; past that it steps out of sight until the panel goes */
@@ -144,31 +143,45 @@
         return bar ? bar.querySelector('.sf-toolbar-toggle-button') : null;
     }
 
+    /* The layers of the page fixed in the window: one walk of the document, the toolbar and the inside of drawings (svg) left out, not going into a layer once found. Found under a grid of points before (elementsFromPoint, then elementFromPoint): each point a hit test, 16 ms on a page of thousands of drawn shapes on a busy machine, and a pass of a hundred of them every time such a page changed - an intro of dancing characters lost seconds to it. Kept until the end of the task: a pass asks more than once. */
+    var layers = null;
+
+    function fixedLayers() {
+        if (layers) {
+            return layers;
+        }
+        layers = [];
+        window.setTimeout(function () { layers = null; }, 0);
+        if (!document.body || !document.createTreeWalker) {
+            return layers;
+        }
+        var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT, {
+            acceptNode: function (node) {
+                if ((bar && (node === bar || bar.contains(node))) || 'svg' === node.localName || 'SCRIPT' === node.tagName || 'STYLE' === node.tagName) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                if ('fixed' === window.getComputedStyle(node).position) {
+                    layers.push(node);
+                    return NodeFilter.FILTER_REJECT;
+                }
+
+                return NodeFilter.FILTER_SKIP;
+            }
+        });
+        while (walker.nextNode()) { /* acceptNode collects */ }
+
+        return layers;
+    }
+
     /* The height of a bar the page keeps fixed along the bottom of the window (a navigation, a player): wide, low, touching the bottom. */
     function pageBottomBar() {
         var lift = 0;
         var height = window.innerHeight;
-        var seen = [];
-        if (!document.elementsFromPoint) {
-            return 0;
-        }
-        for (var i = 1; i <= 3; i++) {
-            var stack = document.elementsFromPoint(window.innerWidth * i / 4, height - 2);
-            for (var j = 0; j < stack.length; j++) {
-                for (var el = stack[j]; el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
-                    if (-1 !== seen.indexOf(el) || (bar && bar.contains(el))) {
-                        break;
-                    }
-                    seen.push(el);
-                    if ('fixed' !== window.getComputedStyle(el).position) {
-                        continue;
-                    }
-                    var rect = el.getBoundingClientRect();
-                    if (rect.bottom >= height - MARGIN && rect.width >= window.innerWidth / 2 && rect.height > 0 && rect.height <= Math.min(NAV_HEIGHT, height / 4)) {
-                        lift = Math.max(lift, height - rect.top);
-                    }
-                    break;
-                }
+        var fixed = fixedLayers();
+        for (var i = 0; i < fixed.length; i++) {
+            var rect = fixed[i].getBoundingClientRect();
+            if (rect.bottom >= height - MARGIN && rect.width >= window.innerWidth / 2 && rect.height > 0 && rect.height <= Math.min(NAV_HEIGHT, height / 4)) {
+                lift = Math.max(lift, height - rect.top);
             }
         }
 
@@ -222,7 +235,6 @@
     function panels(left, right) {
         var found = [];
         var list = [];
-        var seen = [];
         var width = window.innerWidth;
         var height = window.innerHeight;
 
@@ -270,24 +282,11 @@
         for (var m = 0; m < marked.length; m++) {
             take(marked[m]);
         }
-        if (document.elementsFromPoint) {
-            for (var py = GRID / 2; py < height; py += GRID) {
-                for (var c = 0; c <= 4; c++) {
-                    var stack = document.elementsFromPoint(left + 2 + (right - left - 4) * c / 4, py);
-                    for (var j = 0; j < stack.length; j++) {
-                        for (var el = stack[j]; el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
-                            if (-1 !== seen.indexOf(el) || bar.contains(el)) {
-                                break;
-                            }
-                            seen.push(el);
-                            if ('fixed' === window.getComputedStyle(el).position) {
-                                take(el);
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
+
+        /* Every layer fixed in the window: take() keeps those across the toolbar's column that hold a control. */
+        var fixed = fixedLayers();
+        for (var f = 0; f < fixed.length; f++) {
+            take(fixed[f]);
         }
 
         return list;
@@ -423,7 +422,7 @@
 
     /* The panels found so far, each watched for a change of size. */
     var watched = [];
-    var resizes = window.ResizeObserver ? new ResizeObserver(function () { settle(); }) : null;
+    var resizes = window.ResizeObserver ? new ResizeObserver(function () { settleLater(); }) : null;
 
     function watch(el) {
         if (!resizes || -1 !== watched.indexOf(el)) {
@@ -436,6 +435,25 @@
     /* Put back inside the window after it, the page or the toolbar changed; the place kept is left as it was. A change of the page (a panel, a transition) waits while the pointer is over the toolbar: hovering its blocks moves nothing. */
     function settle() {
         schedule(false);
+    }
+
+    /* After a change of the page itself (a node added, a transition or an animation ended, a panel resized): when the browser is idle, every change of a burst in one pass. Measured in the next frame instead, a page that changes on every frame (a line typed letter by letter, characters coming in one after another while it scrolls) had the toolbar laying the page out again in each of its frames: 20-40 ms a frame on a busy machine, felt as a scroll that lags. */
+    var idleQueued = false;
+
+    function settleLater() {
+        if (idleQueued) {
+            return;
+        }
+        idleQueued = true;
+        var run = function () {
+            idleQueued = false;
+            settle();
+        };
+        if (window.requestIdleCallback) {
+            window.requestIdleCallback(run, { timeout: 500 });
+        } else {
+            window.setTimeout(run, 200);
+        }
     }
 
     /* After what the visitor did to the toolbar or the window (opened or closed it, resized either): at once, hovered or not. */
@@ -754,11 +772,25 @@
             settleNow();
         }
     }, true);
-    document.addEventListener('transitionend', function () { settle(); });
-    document.addEventListener('animationend', function () { settle(); });
+    /* A panel's own transition or animation ending (a cookie question sliding in): the others are no matter. A page whose characters dance in a loop sent one every few frames, and a pass each time - every one of them hit-testing the whole crowd. A panel coming in at all is told by the change that brought it. */
+    function panelEvent(event) {
+        var target = event.target;
+        if (!target || 1 !== target.nodeType) {
+            return false;
+        }
+        for (var i = 0; i < watched.length; i++) {
+            if (watched[i] === target || watched[i].contains(target)) {
+                return true;
+            }
+        }
+
+        return !!(target.matches && target.matches(PANELS));
+    }
+    document.addEventListener('transitionend', function (event) { if (panelEvent(event)) { settleLater(); } });
+    document.addEventListener('animationend', function (event) { if (panelEvent(event)) { settleLater(); } });
     window.addEventListener('consent:change', function () { settle(); });
 
-    /* What changes inside a panel already found (the cookie question's countdown, each second) is no matter unless the panel changes size, which its ResizeObserver tells; and what changes inside a drawing (an SVG animation's thousands of shapes, glitchr's intro) never moves a panel. Each pass measures the page under a grid of points: on glitchr's intro, a pass a second over its 17,000 shapes froze the animation 80-160 ms each time. */
+    /* What changes inside a panel already found (the cookie question's countdown, each second) is no matter unless the panel changes size, which its ResizeObserver tells; and what changes inside a drawing (an SVG animation's thousands of shapes, glitchr's intro) never moves a panel. When a pass measured the page under a grid of points, one a second over glitchr's intro and its 17,000 shapes froze the animation 80-160 ms each time. */
     function inPanel(node) {
         for (var i = 0; i < watched.length; i++) {
             if (watched[i] !== node && watched[i].contains(node)) {
@@ -788,7 +820,11 @@
         if (target.closest && target.closest('svg')) {
             return false;
         }
-        if (resizes && inPanel(target) && ('attributes' === record.type || textOnly(record))) {
+        /* Text alone never brings a panel nor takes one away: a line typed letter by letter, a clock, a countdown. A panel it grows is one already found, whose ResizeObserver tells. */
+        if ('childList' === record.type && textOnly(record)) {
+            return false;
+        }
+        if (resizes && inPanel(target) && 'attributes' === record.type) {
             return false;
         }
 
@@ -800,7 +836,7 @@
         for (var i = 0; i < records.length; i++) {
             if (!bar || matters(records[i])) {
                 acquire();
-                settle();
+                settleLater();
 
                 return;
             }

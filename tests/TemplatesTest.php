@@ -194,7 +194,7 @@ final class TemplatesTest extends TestCase
     {
         $js = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.js.twig');
 
-        foreach (['function bounds()', 'function floor(page)', 'function pageBottomBar()', 'function settle()', 'window.visualViewport', 'document.elementsFromPoint', "'transitionend'"] as $used) {
+        foreach (['function bounds()', 'function floor(page)', 'function pageBottomBar()', 'function settle()', 'window.visualViewport', 'function fixedLayers()', 'document.createTreeWalker(document.body', "'transitionend'"] as $used) {
             self::assertStringContainsString($used, $js);
         }
         self::assertStringContainsString('var minX = -box.tipLeft;', $js, 'Sent aside, the grip at the end of the handle stays in view.');
@@ -263,7 +263,7 @@ final class TemplatesTest extends TestCase
     {
         $js = (string) file_get_contents(self::TEMPLATES.'/Toolbar/floating.js.twig');
 
-        foreach (['function panels(left, right)', 'function nearestClear(', 'function clearOfPanels(', 'document.querySelectorAll(PANELS)', "'fixed' === window.getComputedStyle(el).position"] as $used) {
+        foreach (['function panels(left, right)', 'function nearestClear(', 'function clearOfPanels(', 'document.querySelectorAll(PANELS)', "'fixed' === window.getComputedStyle(node).position"] as $used) {
             self::assertStringContainsString($used, $js);
         }
         self::assertSame(1, preg_match("~var PANELS = '([^']+)';~", $js, $panels));
@@ -287,7 +287,7 @@ final class TemplatesTest extends TestCase
 
         /* A panel shown or hidden, sliding in, a cookie question answered. */
         self::assertStringContainsString("attributes: true, attributeFilter: ['hidden', 'class', 'open', 'aria-hidden', 'aria-expanded']", $js);
-        self::assertStringContainsString("document.addEventListener('animationend', function () { settle(); });", $js);
+        self::assertStringContainsString("document.addEventListener('animationend', function (event) { if (panelEvent(event)) { settleLater(); } });", $js);
         self::assertStringContainsString("window.addEventListener('consent:change', function () { settle(); });", $js);
     }
 
@@ -365,6 +365,6 @@ final class TemplatesTest extends TestCase
         self::assertStringContainsString('hover(bar);', $js);
         self::assertStringContainsString("window.addEventListener('resize', settleNow);", $js);
         self::assertMatchesRegularExpression('~if \(onHandle\(event\)\) \{\s*settleNow\(\);~', $js, 'Opened or closed by the visitor.');
-        self::assertStringContainsString('new ResizeObserver(function () { settle(); })', $js);
+        self::assertStringContainsString('new ResizeObserver(function () { settleLater(); })', $js);
     }
 }
